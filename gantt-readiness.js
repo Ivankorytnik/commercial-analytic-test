@@ -8,7 +8,9 @@
     medium: '#42d7c8',
     high: '#149d91',
     done: '#2ca66f',
-    blocker: '#d9534f'
+    blocker: '#d9534f',
+    extended: '#d99000',
+    changed: '#66797a'
   };
 
   const TASKS = [
@@ -46,6 +48,10 @@
     return new Date(parts[0], parts[1] - 1, parts[2], 23, 59, 59, 999).getTime();
   }
 
+  function originalDue(task, projectStart) {
+    return endOfLocalDay(toDateInput(addDays(projectStart, task.end)));
+  }
+
   function dueKey(id) {
     return `atom-gantt-due-${id}`;
   }
@@ -65,22 +71,41 @@
   function effectiveDue(task, projectStart) {
     const custom = localStorage.getItem(dueKey(task.id));
     const customTs = endOfLocalDay(custom);
-    return customTs || addDays(projectStart, task.end);
+    return customTs || originalDue(task, projectStart);
   }
 
   function effectiveEndDay(task, projectStart) {
     const due = effectiveDue(task, projectStart);
-    return Math.max(task.end, Math.ceil((due - projectStart) / DAY_MS));
+    return Math.max(task.start + 1, Math.ceil((due - projectStart) / DAY_MS));
   }
 
   function taskState(task, projectStart, now) {
     const status = getStageStatus(task.id);
     const percent = getStageProgress(task.id);
     const due = effectiveDue(task, projectStart);
+    const baseDue = originalDue(task, projectStart);
     const start = addDays(projectStart, task.start);
     const overdue = isStarted() && status !== 'Завершено' && now > due;
     const customDue = localStorage.getItem(dueKey(task.id));
-    return { ...task, status, percent, due, startDate: start, overdue, customDue, history: getHistory(task.id) };
+    const changed = Boolean(customDue);
+    const extended = changed && due > baseDue;
+    const shortened = changed && due < baseDue;
+    const deltaDays = changed ? Math.round((due - baseDue) / DAY_MS) : 0;
+    return {
+      ...task,
+      status,
+      percent,
+      due,
+      originalDue: baseDue,
+      startDate: start,
+      overdue,
+      customDue,
+      changed,
+      extended,
+      shortened,
+      deltaDays,
+      history: getHistory(task.id)
+    };
   }
 
   function readinessColor(state) {
@@ -93,8 +118,11 @@
     return COLORS.notStarted;
   }
 
-  function legendItem(color, text) {
-    return `<span style="display:inline-flex;align-items:center;gap:6px;margin-right:16px;margin-bottom:6px"><span style="width:12px;height:12px;border-radius:3px;background:${color};display:inline-block"></span>${text}</span>`;
+  function legendItem(color, text, striped) {
+    const bg = striped
+      ? `repeating-linear-gradient(135deg,${color} 0,${color} 5px,#ffe5a8 5px,#ffe5a8 10px)`
+      : color;
+    return `<span style="display:inline-flex;align-items:center;gap:6px;margin-right:16px;margin-bottom:6px"><span style="width:12px;height:12px;border-radius:3px;background:${bg};display:inline-block;border:${striped ? '1px solid #b67a00' : '0'}"></span>${text}</span>`;
   }
 
   function getBlockers() {
@@ -119,7 +147,7 @@
       id: Date.now() + state.id,
       autoKey: source,
       source,
-      description: `Просрочен срок этапа. Плановый срок: ${formatDate(state.due)}`,
+      description: `Просрочен срок этапа. Актуальный срок: ${formatDate(state.due)}. Базовый срок: ${formatDate(state.originalDue)}`,
       severity: 'Высокая',
       owner: 'Не назначен',
       due: '',
@@ -133,23 +161,9 @@
   function appendRescheduleToBlocker(task, oldDue, newDue, reason) {
     const source = `Гант: ${task.name}`;
     const blockers = getBlockers();
-    let blocker = blockers.find(x => x.autoKey === source && !['Закрыт'].includes(x.status));
-    if (!blocker) {
-      blocker = {
-        id: Date.now() + task.id,
-        autoKey: source,
-        source,
-        description: `Перенос срока этапа после просрочки. Старый срок: ${formatDate(oldDue)}`,
-        severity: 'Высокая',
-        owner: 'Не назначен',
-        due: '',
-        status: 'Открыт',
-        comment: '',
-        createdAt: new Date().toISOString()
-      };
-      blockers.push(blocker);
-    }
-    const line = `Срок перенесен: ${formatDate(oldDue)} -> ${formatDate(newDue)}${reason ? `. Причина: ${reason}` : ''}`;
+    const blocker = blockers.find(x => x.autoKey === source && !['Закрыт'].includes(x.status));
+    if (!blocker) return;
+    const line = `Срок изменен: ${formatDate(oldDue)} -> ${formatDate(newDue)}${reason ? `. Причина: ${reason}` : ''}`;
     blocker.comment = blocker.comment ? `${blocker.comment}\n${line}` : line;
     saveBlockers(blockers);
   }
@@ -157,11 +171,23 @@
   function saveReschedule(id, newDate, reason) {
     const task = TASKS.find(x => x.id === id);
     if (!task || !newDate) return;
+    if (!isStarted()) {
+      alert('Сроки можно менять после старта проекта');
+      return;
+    }
+
     const projectStart = startTs();
     const oldDue = effectiveDue(task, projectStart);
+    const baseDue = originalDue(task, projectStart);
     const newDue = endOfLocalDay(newDate);
-    if (!newDue || newDue <= Date.now()) {
-      alert('Укажи новый срок позднее текущей даты');
+    const taskStart = addDays(projectStart, task.start);
+
+    if (!newDue || newDue < taskStart) {
+      alert('Срок не может быть раньше начала этапа');
+      return;
+    }
+    if (newDue > baseDue && !reason.trim()) {
+      alert('Для продления срока укажи причину');
       return;
     }
 
@@ -170,6 +196,8 @@
       changedAt: new Date().toISOString(),
       oldDue: toDateInput(oldDue),
       newDue: newDate,
+      originalDue: toDateInput(baseDue),
+      type: newDue > baseDue ? 'extended' : (newDue < baseDue ? 'shortened' : 'baseline'),
       reason: reason || ''
     });
     localStorage.setItem(historyKey(id), JSON.stringify(history));
@@ -178,15 +206,52 @@
     render('gantt');
   }
 
+  function resetDue(id) {
+    const task = TASKS.find(x => x.id === id);
+    if (!task || !isStarted()) return;
+    const projectStart = startTs();
+    const oldDue = effectiveDue(task, projectStart);
+    const baseDue = originalDue(task, projectStart);
+    const history = getHistory(id);
+    history.push({
+      changedAt: new Date().toISOString(),
+      oldDue: toDateInput(oldDue),
+      newDue: toDateInput(baseDue),
+      originalDue: toDateInput(baseDue),
+      type: 'reset',
+      reason: 'Возврат к базовому сроку'
+    });
+    localStorage.setItem(historyKey(id), JSON.stringify(history));
+    localStorage.removeItem(dueKey(id));
+    appendRescheduleToBlocker(task, oldDue, baseDue, 'Возврат к базовому сроку');
+    render('gantt');
+  }
+
   function renderRescheduleForm(state) {
-    const min = toDateInput(Date.now() + DAY_MS);
+    const min = toDateInput(state.startDate);
+    const value = state.customDue || toDateInput(state.originalDue);
     return `<div class="gantt-reschedule-form" data-reschedule-form="${state.id}" style="display:none;margin-top:8px;padding:10px;border:1px solid #dbe5e5;border-radius:8px;background:#f8fbfb">
+      <div style="font-size:11px;color:#66797a;margin-bottom:7px">Базовый срок: <b>${formatDate(state.originalDue)}</b></div>
       <div style="display:grid;grid-template-columns:150px minmax(180px,1fr) auto;gap:8px;align-items:center">
-        <input type="date" class="gantt-new-due" data-id="${state.id}" min="${min}" value="${state.customDue || ''}">
-        <input type="text" class="gantt-reschedule-reason" data-id="${state.id}" placeholder="Причина переноса">
+        <input type="date" class="gantt-new-due" data-id="${state.id}" min="${min}" value="${value}">
+        <input type="text" class="gantt-reschedule-reason" data-id="${state.id}" placeholder="Причина изменения срока">
         <button class="btn primary gantt-save-due" data-id="${state.id}">Сохранить</button>
       </div>
+      ${state.changed ? `<button class="btn gantt-reset-due" data-id="${state.id}" style="margin-top:8px;padding:5px 8px;font-size:11px">Вернуть базовый срок</button>` : ''}
     </div>`;
+  }
+
+  function deadlineLabel(state) {
+    if (!state.changed) {
+      return `<small style="color:#66797a">Базовый срок: ${formatDate(state.originalDue)}</small>`;
+    }
+    if (state.extended) {
+      return `<small style="color:#946a00;font-weight:700">ПРОДЛЕН +${Math.max(1, state.deltaDays)} дн. · до ${formatDate(state.due)}</small><small style="color:#66797a">Базовый срок: ${formatDate(state.originalDue)}</small>`;
+    }
+    if (state.shortened) {
+      return `<small style="color:#526667;font-weight:700">Срок изменен на ${Math.abs(state.deltaDays)} дн. раньше · до ${formatDate(state.due)}</small><small style="color:#66797a">Базовый срок: ${formatDate(state.originalDue)}</small>`;
+    }
+    return `<small style="color:#66797a">Срок возвращен к базовому: ${formatDate(state.originalDue)}</small>`;
   }
 
   function lastTransferText(state) {
@@ -194,7 +259,8 @@
     const last = state.history[state.history.length - 1];
     const oldTs = endOfLocalDay(last.oldDue);
     const newTs = endOfLocalDay(last.newDue);
-    return `<small style="color:#946a00">Срок перенесен: ${formatDate(oldTs)} -> ${formatDate(newTs)}</small>`;
+    const reason = last.reason ? ` · ${last.reason}` : '';
+    return `<small style="color:#7a8585">Последнее изменение: ${formatDate(oldTs)} -> ${formatDate(newTs)}${reason}</small>`;
   }
 
   window.ATOM_GANTT = {
@@ -218,37 +284,50 @@
     const states = TASKS.map(task => taskState(task, plannedStart, now));
     states.forEach(ensureOverdueBlocker);
 
-    const maxEndDay = Math.max(90, ...TASKS.map(task => effectiveEndDay(task, plannedStart)));
+    const maxEndDay = Math.max(90, ...states.map(state => effectiveEndDay(state, plannedStart)));
     const horizonDays = Math.ceil(maxEndDay / 7) * 7;
     const weeks = Math.ceil(horizonDays / 7);
     const weekHeaders = Array.from({ length: weeks }, (_, i) => `<div class="gantt-week">Н${i + 1}</div>`).join('');
     const gridStep = 100 / weeks;
 
     const rows = states.map(state => {
-      const endDay = effectiveEndDay(state, plannedStart);
+      const currentEndDay = effectiveEndDay(state, plannedStart);
+      const originalEndDay = state.end;
       const color = readinessColor(state);
       const left = state.start / horizonDays * 100;
-      const width = Math.max(2, (endDay - state.start) / horizonDays * 100);
+      const currentWidth = Math.max(2, (currentEndDay - state.start) / horizonDays * 100);
+      const originalWidth = Math.max(2, (originalEndDay - state.start) / horizonDays * 100);
+      const extensionLeft = originalEndDay / horizonDays * 100;
+      const extensionWidth = Math.max(0, (currentEndDay - originalEndDay) / horizonDays * 100);
       const dueText = formatDate(state.due);
       const statusText = state.overdue ? 'Просрочка / Блокер' : state.status;
-      const transferButton = state.overdue || state.customDue
-        ? `<button class="btn gantt-reschedule-btn" data-id="${state.id}" style="margin-top:6px;padding:5px 8px;font-size:11px">${state.customDue ? 'Изменить срок' : 'Перенести срок'}</button>`
+      const transferButton = isStarted()
+        ? `<button class="btn gantt-reschedule-btn" data-id="${state.id}" style="margin-top:6px;padding:5px 8px;font-size:11px">Изменить срок</button>`
         : '';
       const overdueNote = state.overdue ? `<small style="color:#a53636;font-weight:700">Просрочено. Актуальный срок: ${dueText}</small>` : '';
+
+      let barHtml;
+      if (state.extended) {
+        barHtml = `<div class="gantt-bar" title="${state.name}: базовая часть" style="left:${left}%;width:${originalWidth}%;background:${color}"></div>
+          <div class="gantt-bar" title="Продление: +${Math.max(1, state.deltaDays)} дн." style="left:${extensionLeft}%;width:${extensionWidth}%;background:repeating-linear-gradient(135deg,#d99000 0,#d99000 6px,#ffe5a8 6px,#ffe5a8 12px);border:1px solid #b67a00;box-shadow:none"></div>`;
+      } else {
+        barHtml = `<div class="gantt-bar" title="${state.name}: ${state.percent}% · ${statusText}" style="left:${left}%;width:${currentWidth}%;background:${color}"></div>`;
+      }
 
       return `<div class="gantt-row">
         <div class="gantt-task">
           <b>${state.name}</b>
           <small>${formatDate(state.startDate)} - ${dueText}</small>
           <small><b>${state.percent}%</b> · ${statusText}</small>
+          ${deadlineLabel(state)}
           ${overdueNote}
-          ${lastTransferText(state)}
+          ${state.changed ? lastTransferText(state) : ''}
           ${transferButton}
           ${renderRescheduleForm(state)}
         </div>
         <div class="gantt-track">
           <div class="gantt-grid" style="background:repeating-linear-gradient(to right,transparent 0,transparent calc(${gridStep}% - 1px),var(--line) calc(${gridStep}% - 1px),var(--line) ${gridStep}%)"></div>
-          <div class="gantt-bar" title="${state.name}: ${state.percent}% · ${statusText}" style="left:${left}%;width:${width}%;background:${color}"></div>
+          ${barHtml}
         </div>
       </div>`;
     }).join('');
@@ -260,16 +339,17 @@
       ${legendItem(COLORS.high, '75-99% Близко к завершению')}
       ${legendItem(COLORS.done, '100% Готово')}
       ${legendItem(COLORS.blocker, 'Блокер / просрочка')}
+      ${legendItem(COLORS.extended, 'Продленный срок', true)}
     </div>`;
 
-    return `<div class="section-title"><h2>Диаграмма Ганта</h2><small>Просрочка автоматически становится блокером</small></div>
-      <div class="callout"><b>${isStarted() ? 'Гант рассчитан от фактической даты старта проекта.' : 'Проект еще не запущен.'}</b> ${isStarted() ? 'Если срок этапа прошел, а этап не завершен, он отображается красным и фиксируется в блокерах. Срок можно перенести.' : 'До старта все этапы отображаются нейтральным цветом.'}</div>
+    return `<div class="section-title"><h2>Диаграмма Ганта</h2><small>Базовые и продленные сроки отображаются отдельно</small></div>
+      <div class="callout"><b>${isStarted() ? 'Срок любого этапа можно изменить.' : 'Проект еще не запущен.'}</b> ${isStarted() ? 'Если новый срок позже базового, добавленная часть полосы показывается штриховкой и этап получает отметку «ПРОДЛЕН». Причина продления обязательна.' : 'После старта проекта появятся кнопки изменения сроков.'}</div>
       ${legend}
       <div class="gantt-wrap">
         <div class="gantt-head"><div class="gantt-task-head">Этап</div><div class="gantt-weeks" style="grid-template-columns:repeat(${weeks},1fr)">${weekHeaders}</div></div>
         ${rows}
       </div>
-      <div class="gantt-footer"><span>Старт: <b>${formatDate(plannedStart)}</b></span><span>Плановое завершение проекта: <b>${formatDate(addDays(plannedStart, 90))}</b></span><span>Базовый срок: <b>3 месяца / 90 дней</b></span></div>`;
+      <div class="gantt-footer"><span>Старт: <b>${formatDate(plannedStart)}</b></span><span>Базовое завершение проекта: <b>${formatDate(addDays(plannedStart, 90))}</b></span><span>Базовый срок: <b>3 месяца / 90 дней</b></span></div>`;
   };
 
   document.addEventListener('click', event => {
@@ -286,6 +366,12 @@
       const date = document.querySelector(`.gantt-new-due[data-id="${id}"]`)?.value || '';
       const reason = document.querySelector(`.gantt-reschedule-reason[data-id="${id}"]`)?.value.trim() || '';
       saveReschedule(id, date, reason);
+      return;
+    }
+
+    const reset = event.target.closest('.gantt-reset-due');
+    if (reset) {
+      resetDue(Number(reset.dataset.id));
     }
   });
 })();
