@@ -17,7 +17,7 @@
       <h1>Контроль готовности проекта коммерческой аналитики</h1>
       <p>Контрольный центр проекта до запуска единого сквозного дашборда</p>
       <div class="build-meta">
-        <span>Версия <b>v0.7.2 TEST SYNC</b></span>
+        <span>Версия <b>v0.7.3 TEST SYNC</b></span>
         <span>Обновлено <b>10.09.2026 · 18:18</b></span>
       </div>
     </div>
@@ -54,7 +54,7 @@
       let started=false;
       function loadApp(){
         if(started)return; started=true;
-        ['app.js?v=0.7.2-sync','gantt-readiness.js?v=0.7.2-sync','project-countdown.js?v=0.7.2-sync','overview-summary.js?v=0.7.2-sync'].forEach(src=>{
+        ['app.js?v=0.7.2-sync','gantt-readiness.js?v=0.7.3-sync','project-countdown.js?v=0.7.2-sync','overview-summary.js?v=0.7.2-sync'].forEach(src=>{
           const s=document.createElement('script'); s.src=src; s.async=false; document.body.appendChild(s);
         });
       }
