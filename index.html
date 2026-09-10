@@ -22,8 +22,8 @@
       <h1>Контроль готовности проекта коммерческой аналитики</h1>
       <p>Контрольный центр проекта до запуска единого сквозного дашборда</p>
       <div class="build-meta">
-        <span>Версия <b>v1.1.1 TEST LOGIC</b></span>
-        <span>Обновлено <b>10.09.2026 · 20:55</b></span>
+        <span>Версия <b>v1.1.2 TEST LOGIC</b></span>
+        <span>Обновлено <b>10.09.2026 · 21:03</b></span>
       </div>
     </div>
     <div class="header-status">
@@ -75,10 +75,12 @@
           'weekly-history.js?v=1.0.1',
           'custom-data.js?v=0.8.6-sync',
           'security.js?v=0.8.7-sync',
+          'raci-gantt-schedule.js?v=1.1.2',
           'raci-requirements.js?v=0.9.2-sync',
           'expanded-gantt.js?v=1.1.0',
           'project-reconcile.js?v=1.0.0',
-          'logic-ui.js?v=1.0.0'
+          'logic-ui.js?v=1.0.0',
+          'raci-gantt-period-ui.js?v=1.1.2'
         ].forEach(src=>{const s=document.createElement('script');s.src=src;s.async=false;document.body.appendChild(s);});
       }
       window.addEventListener('atom-sync-ready',loadApp,{once:true});
