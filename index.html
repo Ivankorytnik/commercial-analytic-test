@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Коммерческая аналитика АТОМ</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+<h1>Коммерческая аналитика АТОМ</h1>
+<div class="login">
+<h2>Вход</h2>
+<input id="email" placeholder="Email">
+<input id="password" type="password" placeholder="Пароль">
+<button onclick="login()">Войти</button>
+</div>
+<div id="dashboard" class="hidden">
+<h2>Дашборд</h2>
+<div class="cards">
+<div>Задачи<br><b>0</b></div>
+<div>Лиды<br><b>0</b></div>
+<div>Блокеры<br><b>0</b></div>
+<div>Готовность проекта<br><b>0%</b></div>
+</div>
+<h3>Роль пользователя</h3>
+<div id="role">Не определена</div>
+</div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
