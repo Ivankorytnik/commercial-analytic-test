@@ -1,8 +1,10 @@
 (function(){
   const STATE_KEY='atom-raci-requirement-state-v2';
+  const CUSTOM_RACI='atom-raci-custom-requirements-v2';
   const CUSTOM_SOURCES='atom-custom-sources-v1';
   const CUSTOM_DICT='atom-custom-dictionary-v1';
   const BLOCKERS='atom-blockers';
+  const BASE_COUNTS={'Коммерческий блок':5,'B2B продажи':8,'B2C продажи':8,'Маркетинг':8,'Сайт':8,'Метрики':8,'1 линия':8,'2 линия':8,'ELMA':11,'Альфа-Авто':12,'1С / финансы':11,'DATA / DWH':11,'BI':10,'ИБ':11};
   let running=false;
 
   const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key)||'')||fallback}catch{return fallback}};
@@ -17,12 +19,11 @@
   };
 
   function raciSummary(){
-    const states=read(STATE_KEY,{}),teams=Array.isArray(DATA?.teams)?DATA.teams:[];
+    const states=read(STATE_KEY,{}),custom=read(CUSTOM_RACI,{}),teams=Array.isArray(DATA?.teams)?DATA.teams:[];
     let total=0,done=0,started=0;
     teams.forEach(([team])=>{
-      const points=states[team]||{};
-      const vals=Object.values(points);
-      total+=vals.length;
+      const vals=Object.values(states[team]||{});
+      total+=(BASE_COUNTS[team]||0)+(Array.isArray(custom[team])?custom[team].length:0);
       vals.forEach(s=>{if(s.status&&s.status!=='Не запрошено')started++;if(s.status==='Готово')done++;});
     });
     const owners=window.ATOM_LOGIC?.ownersSummary?.()||{ready:0,total:teams.length};
@@ -45,7 +46,7 @@
   function reconcileStages(){
     let changed=false;
     const r=raciSummary();
-    if(r.owners.total&&r.owners.ready===r.owners.total&&(!r.total||r.done===r.total))changed=setStage(2,'Завершено')||changed;
+    if(r.total>0&&r.owners.total>0&&r.owners.ready===r.owners.total&&r.done===r.total)changed=setStage(2,'Завершено')||changed;
     else if(r.owners.ready>0||r.started>0)changed=setStage(2,'В работе')||changed;
 
     const s=sourceProgress();
@@ -103,5 +104,5 @@
   window.addEventListener('atom-sync-update',run);
   setInterval(run,20000);
   setTimeout(run,1200);
-  window.ATOM_RECONCILE={run};
+  window.ATOM_RECONCILE={run,raciSummary,sourceProgress,dictionaryProgress};
 })();
