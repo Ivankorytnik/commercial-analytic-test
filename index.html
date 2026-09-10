@@ -1,32 +1,118 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Коммерческая аналитика АТОМ</title>
-<link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#111111">
+  <title>Коммерческая аналитика АТОМ</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="app">
-<h1>Коммерческая аналитика АТОМ</h1>
-<div class="login">
-<h2>Вход</h2>
-<input id="email" placeholder="Email">
-<input id="password" type="password" placeholder="Пароль">
-<button onclick="login()">Войти</button>
-</div>
-<div id="dashboard" class="hidden">
-<h2>Дашборд</h2>
-<div class="cards">
-<div>Задачи<br><b>0</b></div>
-<div>Лиды<br><b>0</b></div>
-<div>Блокеры<br><b>0</b></div>
-<div>Готовность проекта<br><b>0%</b></div>
-</div>
-<h3>Роль пользователя</h3>
-<div id="role">Не определена</div>
-</div>
-</div>
-<script src="app.js"></script>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">A</div>
+        <div>
+          <div class="brand-title">АТОМ</div>
+          <div class="brand-subtitle">Коммерческая аналитика</div>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <button class="nav-btn active" data-section="dashboard">Главная</button>
+        <button class="nav-btn" data-section="tasks">Канбан задач</button>
+        <button class="nav-btn" data-section="leads">Лиды</button>
+        <button class="nav-btn" data-section="blockers">Блокеры</button>
+        <button class="nav-btn" data-section="meetings">Встречи</button>
+      </nav>
+
+      <div class="sync-box">
+        <span class="sync-dot" id="syncDot"></span>
+        <div>
+          <div id="syncText">Подключение...</div>
+          <small>Общие данные для всех компьютеров</small>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h1>Коммерческая аналитика АТОМ</h1>
+          <p>Единый контроль задач, лидов, блокеров и встреч</p>
+        </div>
+        <button class="secondary-btn" id="refreshBtn">Обновить</button>
+      </header>
+
+      <section id="dashboard" class="section active-section">
+        <div class="section-head">
+          <div>
+            <h2>Главная</h2>
+            <p>Текущее состояние проекта</p>
+          </div>
+        </div>
+
+        <div class="metric-grid">
+          <article class="metric-card"><span>Задачи</span><strong id="metricTasks">0</strong><small id="metricTasksHint">всего</small></article>
+          <article class="metric-card"><span>В работе</span><strong id="metricInProgress">0</strong><small>активных задач</small></article>
+          <article class="metric-card"><span>Просрочено</span><strong id="metricOverdue">0</strong><small>требуют внимания</small></article>
+          <article class="metric-card"><span>Блокеры</span><strong id="metricBlockers">0</strong><small>открытых</small></article>
+          <article class="metric-card"><span>Лиды</span><strong id="metricLeads">0</strong><small>в работе</small></article>
+          <article class="metric-card readiness-card"><span>Готовность проекта</span><strong id="metricReadiness">0%</strong><div class="progress"><div id="readinessBar"></div></div></article>
+        </div>
+
+        <div class="dashboard-grid">
+          <article class="panel">
+            <div class="panel-head"><h3>Сегодня в работе</h3></div>
+            <div id="todayList" class="list-stack empty-state">Нет задач на сегодня</div>
+          </article>
+          <article class="panel">
+            <div class="panel-head"><h3>Последние изменения</h3></div>
+            <div id="historyList" class="list-stack empty-state">Изменений пока нет</div>
+          </article>
+        </div>
+      </section>
+
+      <section id="tasks" class="section">
+        <div class="section-head">
+          <div><h2>Канбан задач</h2><p>Перетаскивайте карточки между колонками</p></div>
+          <button class="primary-btn" data-open-modal="taskModal">+ Новая задача</button>
+        </div>
+        <div class="kanban" id="kanbanBoard">
+          <div class="kanban-column" data-status="backlog"><div class="column-head"><span>Бэклог</span><b id="count-backlog">0</b></div><div class="column-body" id="col-backlog"></div></div>
+          <div class="kanban-column" data-status="planned"><div class="column-head"><span>Запланировано</span><b id="count-planned">0</b></div><div class="column-body" id="col-planned"></div></div>
+          <div class="kanban-column" data-status="in_progress"><div class="column-head"><span>В работе</span><b id="count-in_progress">0</b></div><div class="column-body" id="col-in_progress"></div></div>
+          <div class="kanban-column" data-status="review"><div class="column-head"><span>Проверка</span><b id="count-review">0</b></div><div class="column-body" id="col-review"></div></div>
+          <div class="kanban-column" data-status="done"><div class="column-head"><span>Готово</span><b id="count-done">0</b></div><div class="column-body" id="col-done"></div></div>
+        </div>
+      </section>
+
+      <section id="leads" class="section">
+        <div class="section-head"><div><h2>Лиды</h2><p>Единый список коммерческих лидов</p></div><button class="primary-btn" data-open-modal="leadModal">+ Новый лид</button></div>
+        <div class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>Компания</th><th>Контакт</th><th>Источник</th><th>Стадия</th><th>Менеджер</th><th>Следующий шаг</th><th></th></tr></thead><tbody id="leadsTable"></tbody></table></div></div>
+      </section>
+
+      <section id="blockers" class="section">
+        <div class="section-head"><div><h2>Блокеры</h2><p>Проблемы, которые мешают движению проекта</p></div><button class="primary-btn" data-open-modal="blockerModal">+ Новый блокер</button></div>
+        <div id="blockersList" class="cards-list"></div>
+      </section>
+
+      <section id="meetings" class="section">
+        <div class="section-head"><div><h2>Встречи</h2><p>Цели, результаты и следующие шаги</p></div><button class="primary-btn" data-open-modal="meetingModal">+ Новая встреча</button></div>
+        <div class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>Дата</th><th>Команда</th><th>Цель / адженда</th><th>Результат</th><th>Следующие шаги</th><th></th></tr></thead><tbody id="meetingsTable"></tbody></table></div></div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal" id="taskModal"><div class="modal-card"><div class="modal-head"><h3>Новая задача</h3><button class="icon-btn" data-close-modal>×</button></div><form id="taskForm" class="form-grid"><label class="full">Название<input name="title" required></label><label>Направление<input name="direction" placeholder="Например, ELMA"></label><label>Ответственный<input name="owner"></label><label>Статус<select name="status"><option value="backlog">Бэклог</option><option value="planned">Запланировано</option><option value="in_progress">В работе</option><option value="review">Проверка</option><option value="done">Готово</option></select></label><label>Приоритет<select name="priority"><option value="low">Низкий</option><option value="medium" selected>Средний</option><option value="high">Высокий</option><option value="critical">Критичный</option></select></label><label>Дата начала<input type="date" name="start_date"></label><label>Срок<input type="date" name="due_date"></label><label class="full">Комментарий<textarea name="description" rows="3"></textarea></label><div class="form-actions full"><button type="button" class="secondary-btn" data-close-modal>Отмена</button><button class="primary-btn" type="submit">Сохранить</button></div></form></div></div>
+
+  <div class="modal" id="leadModal"><div class="modal-card"><div class="modal-head"><h3>Новый лид</h3><button class="icon-btn" data-close-modal>×</button></div><form id="leadForm" class="form-grid"><label>Компания<input name="company" required></label><label>Контакт<input name="contact"></label><label>Источник<input name="source"></label><label>Стадия<input name="stage" value="new"></label><label>Менеджер<input name="manager"></label><label>Срок следующего действия<input type="date" name="due_date"></label><label class="full">Следующий шаг<input name="next_action"></label><div class="form-actions full"><button type="button" class="secondary-btn" data-close-modal>Отмена</button><button class="primary-btn" type="submit">Сохранить</button></div></form></div></div>
+
+  <div class="modal" id="blockerModal"><div class="modal-card"><div class="modal-head"><h3>Новый блокер</h3><button class="icon-btn" data-close-modal>×</button></div><form id="blockerForm" class="form-grid"><label class="full">Проблема<input name="title" required></label><label>Ответственный<input name="owner"></label><label>Срок решения<input type="date" name="due_date"></label><label class="full">Описание<textarea name="description" rows="3"></textarea></label><div class="form-actions full"><button type="button" class="secondary-btn" data-close-modal>Отмена</button><button class="primary-btn" type="submit">Сохранить</button></div></form></div></div>
+
+  <div class="modal" id="meetingModal"><div class="modal-card"><div class="modal-head"><h3>Новая встреча</h3><button class="icon-btn" data-close-modal>×</button></div><form id="meetingForm" class="form-grid"><label>Команда<input name="team" required></label><label>Дата и время<input type="datetime-local" name="meeting_date" required></label><label class="full">Адженда / цель<textarea name="agenda" rows="2"></textarea></label><label class="full">Результат<textarea name="result" rows="2"></textarea></label><label class="full">Следующие шаги<textarea name="next_steps" rows="2"></textarea></label><div class="form-actions full"><button type="button" class="secondary-btn" data-close-modal>Отмена</button><button class="primary-btn" type="submit">Сохранить</button></div></form></div></div>
+
+  <div id="toast" class="toast"></div>
+  <script src="app.js"></script>
 </body>
 </html>
