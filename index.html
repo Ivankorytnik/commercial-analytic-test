@@ -9,6 +9,31 @@
   <title>АТОМ | Контроль готовности проекта коммерческой аналитики</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=test-2" />
   <link rel="stylesheet" href="styles.css?v=0.7.2-sync" />
+  <style>
+    .nav-info-separator{
+      margin:18px 8px 8px;
+      padding:14px 6px 0;
+      border-top:1px solid #dbe5e5;
+      color:#8a9b9c;
+      font-size:10px;
+      font-weight:700;
+      letter-spacing:1px;
+      text-transform:uppercase;
+    }
+    .nav-info-separator~.nav{
+      background:#f7f9f9;
+      color:#5b7071;
+      border-left:2px solid transparent;
+      font-size:13px;
+    }
+    .nav-info-separator~.nav:hover,
+    .nav-info-separator~.nav.active{
+      background:#eef5f4;
+      color:#294343;
+      border-left-color:#35d8c7;
+      font-weight:700;
+    }
+  </style>
 </head>
 <body>
   <header class="topbar">
@@ -17,8 +42,8 @@
       <h1>Контроль готовности проекта коммерческой аналитики</h1>
       <p>Контрольный центр проекта до запуска единого сквозного дашборда</p>
       <div class="build-meta">
-        <span>Версия <b>v0.8.7 TEST SYNC</b></span>
-        <span>Обновлено <b>10.09.2026 · 20:07</b></span>
+        <span>Версия <b>v0.8.8 TEST SYNC</b></span>
+        <span>Обновлено <b>10.09.2026 · 20:11</b></span>
       </div>
     </div>
     <div class="header-status">
@@ -41,6 +66,8 @@
       <button class="nav" data-view="funnel">Сквозной путь</button>
       <button class="nav" data-view="dictionary">Data Dictionary</button>
       <button class="nav" data-view="issues">Блокеры</button>
+
+      <div class="nav-info-separator">Информация</div>
       <button class="nav" data-view="dod">Definition of Done</button>
     </aside>
 
