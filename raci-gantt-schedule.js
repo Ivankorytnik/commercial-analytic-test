@@ -1,5 +1,4 @@
 (function(){
-  const STATE_KEY='atom-raci-requirement-state-v2';
   const CUSTOM_KEY='atom-raci-custom-requirements-v2';
   const DAY=86400000;
   const TEAM_WINDOWS={
@@ -25,12 +24,10 @@
   const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key)||'')||fallback}catch{return fallback}};
   const pad=n=>String(n).padStart(2,'0');
   const dateInput=ts=>{const d=new Date(ts);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`};
-  const parseDate=v=>{if(!v)return null;const p=v.split('-').map(Number);if(p.length!==3||p.some(Number.isNaN))return null;return new Date(p[0],p[1]-1,p[2]).getTime()};
   const addDays=(ts,n)=>{const d=new Date(ts);d.setHours(0,0,0,0);d.setDate(d.getDate()+n);return d.getTime()};
   const projectStart=()=>Number(localStorage.getItem('atom-project-started-at')||0)||Date.now();
   const customIds=team=>(read(CUSTOM_KEY,{})[team]||[]).map(x=>x.id);
   const ids=team=>[...Array.from({length:BASE_COUNTS[team]||0},(_,i)=>`base-${i+1}`),...customIds(team)];
-  const itemState=(team,id)=>{const all=read(STATE_KEY,{});return all[team]?.[id]||{}};
 
   function derived(team,index,total,start){
     const win=TEAM_WINDOWS[team]||[0,91];
@@ -45,14 +42,10 @@
 
   function period(team,id){
     const list=ids(team),index=Math.max(0,list.indexOf(id)),total=Math.max(1,list.length),start=projectStart();
-    const st=itemState(team,id),req=parseDate(st.requestDate),due=parseDate(st.dueDate);
-    let out;
-    if(req&&due)out={start:req,end:Math.max(req,due),derived:false};
-    else if(req)out={start:req,end:addDays(req,7),derived:false};
-    else if(due)out={start:addDays(due,-7),end:due,derived:false};
-    else out=derived(team,index,total,start);
-    const startOffset=Math.max(0,Math.round((out.start-new Date(new Date(start).getFullYear(),new Date(start).getMonth(),new Date(start).getDate()).getTime())/DAY));
-    const endOffset=Math.max(startOffset+1,Math.round((out.end-new Date(new Date(start).getFullYear(),new Date(start).getMonth(),new Date(start).getDate()).getTime())/DAY));
+    const out=derived(team,index,total,start);
+    const baseStart=new Date(start);baseStart.setHours(0,0,0,0);
+    const startOffset=Math.max(0,Math.round((out.start-baseStart.getTime())/DAY));
+    const endOffset=Math.max(startOffset+1,Math.round((out.end-baseStart.getTime())/DAY));
     return {...out,startDate:dateInput(out.start),endDate:dateInput(out.end),weekFrom:Math.floor(startOffset/7)+1,weekTo:Math.max(Math.floor(Math.max(0,endOffset-1)/7)+1,Math.floor(startOffset/7)+1)};
   }
 
