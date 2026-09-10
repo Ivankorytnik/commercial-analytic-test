@@ -1,87 +1,55 @@
-const API='https://ytdacypygsfalkixhemj.supabase.co/functions/v1/commercial-analytics-api';
-const state={tasks:[],leads:[],blockers:[],meetings:[],history:[]};
-const labels={backlog:'Бэклог',planned:'Запланировано',in_progress:'В работе',review:'Проверка',done:'Готово'};
+let DATA;
+const app=document.getElementById('app');
+const START_KEY='atom-project-started-at';
+const BLOCKERS_KEY='atom-blockers';
+const RESPONSIBLES=['Не назначен','Иван Корытник','Александр Костылев'];
+const STAGE_STATUSES=['Не начато','Подготовка','В работе','Ожидание данных','На согласовании','Блокер','Завершено'];
+const SOURCE_STATUSES=['Не начато','Владелец определен','Доступ запрошен','Доступ получен','Структура данных описана','Данные получены','Интеграция в работе','На проверке','Блокер','Готово'];
+const STATUS_PROGRESS={'Не начато':0,'Подготовка':10,'В работе':40,'Ожидание данных':50,'На согласовании':75,'Блокер':50,'Завершено':100};
+const BLOCKER_STATUSES=['Открыт','В работе','Ожидаем ответ','На эскалации','Решен','Закрыт'];
+const BLOCKER_SEVERITY=['Низкая','Средняя','Высокая','Критическая'];
+let timerHandle=null;
 
-async function call(table,params=''){
-  const r=await fetch(`${API}?table=${table}${params?'&'+params:''}`);
-  if(!r.ok) throw new Error(await r.text());
-  return r.json();
-}
+fetch('data/project.json?v=0.6.0').then(r=>r.json()).then(d=>{DATA=d;render('overview');startProjectClock();});
+document.querySelectorAll('.nav').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active'));btn.classList.add('active');render(btn.dataset.view);}));
 
-async function send(table,method,data,params=''){
-  const r=await fetch(`${API}?table=${table}${params?'&'+params:''}`,{method,headers:{'Content-Type':'application/json'},body:data?JSON.stringify(data):undefined});
-  if(!r.ok) throw new Error(await r.text());
-  const t=await r.text();
-  return t?JSON.parse(t):null;
-}
+const progress=p=>`<div class="progress"><div style="width:${p}%"></div></div>`;
+const isStarted=()=>Boolean(localStorage.getItem(START_KEY));
+const getStageStatus=id=>localStorage.getItem(`atom-stage-status-${id}`)||'Не начато';
+const getStageProgress=id=>isStarted()?(STATUS_PROGRESS[getStageStatus(id)]||0):0;
+const getSourceStatus=id=>localStorage.getItem(`atom-source-status-${id}`)||'Не начато';
+const getDictionaryReady=id=>localStorage.getItem(`atom-dictionary-ready-${id}`)==='1';
+const getProjectProgress=()=>!isStarted()||!DATA?.stages?.length?0:Math.round(DATA.stages.reduce((sum,s)=>sum+getStageProgress(s.id),0)/DATA.stages.length);
+const getBlockers=()=>{try{return JSON.parse(localStorage.getItem(BLOCKERS_KEY)||'[]')}catch{return[]}};
+const saveBlockers=x=>localStorage.setItem(BLOCKERS_KEY,JSON.stringify(x));
+const activeBlockers=()=>getBlockers().filter(x=>!['Решен','Закрыт'].includes(x.status));
+const criticalBlockers=()=>activeBlockers().filter(x=>x.severity==='Критическая').length;
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#039;'}[m]));
 
-function esc(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
-function today(){return new Date().toISOString().slice(0,10)}
-function date(v){return v?new Date(v).toLocaleDateString('ru-RU'):''}
-function sync(ok,text){document.getElementById('syncDot').className='sync-dot '+(ok?'online':'offline');document.getElementById('syncText').textContent=text}
+function updateHeaderProgress(){const p=Math.max(0,Math.min(100,getProjectProgress()));const l=document.getElementById('header-progress'),b=document.getElementById('header-progress-bar');if(l)l.textContent=`${p}%`;if(b)b.style.width=`${p}%`;}
+function render(view){const views={overview,gantt,roadmap,teams,sources,funnel,dictionary,issues,dod};app.innerHTML=views[view]();bindChecks();bindStart();bindResponsibles();bindStageStatuses();bindSourceStatuses();bindDictionaryReady();bindBlockers();updateProjectClock();updateHeaderProgress();}
+function formatStart(ts){return new Intl.DateTimeFormat('ru-RU',{dateStyle:'medium',timeStyle:'medium'}).format(new Date(ts));}
+function formatDate(ts){return new Intl.DateTimeFormat('ru-RU',{day:'2-digit',month:'2-digit',year:'2-digit'}).format(new Date(ts));}
+function formatElapsed(ms){const t=Math.max(0,Math.floor(ms/1000)),d=Math.floor(t/86400),h=Math.floor((t%86400)/3600),m=Math.floor((t%3600)/60),s=t%60,p=n=>String(n).padStart(2,'0');return `${d} дн. ${p(h)}:${p(m)}:${p(s)}`;}
+function addDays(ts,d){return ts+d*86400000;}
+function startProjectClock(){clearInterval(timerHandle);updateProjectClock();timerHandle=setInterval(updateProjectClock,1000);}
+function updateProjectClock(){const ts=localStorage.getItem(START_KEY),timer=document.getElementById('project-timer'),startAt=document.getElementById('project-start-at'),btn=document.getElementById('start-project-btn');if(!timer&&!startAt&&!btn)return;if(!ts){if(timer)timer.textContent='00 дн. 00:00:00';if(startAt)startAt.textContent='Проект еще не начат';if(btn){btn.disabled=false;btn.textContent='Старт проекта';}return;}if(timer)timer.textContent=formatElapsed(Date.now()-Number(ts));if(startAt)startAt.textContent=`Старт: ${formatStart(Number(ts))}`;if(btn){btn.disabled=true;btn.textContent='Проект запущен';}}
+function bindStart(){const btn=document.getElementById('start-project-btn');if(btn)btn.addEventListener('click',()=>{if(isStarted())return;localStorage.setItem(START_KEY,String(Date.now()));render('overview');});}
 
-async function load(){
-  sync(false,'Синхронизация...');
-  try{
-    const [tasks,leads,blockers,meetings,history]=await Promise.all([
-      call('ca_tasks','select=*&order=created_at.desc'),
-      call('ca_leads','select=*&order=created_at.desc'),
-      call('ca_blockers','select=*&order=created_at.desc'),
-      call('ca_meetings','select=*&order=meeting_date.desc'),
-      call('ca_history','select=*&order=created_at.desc&limit=20')
-    ]);
-    Object.assign(state,{tasks,leads,blockers,meetings,history});
-    render();
-    sync(true,'Данные синхронизированы');
-  }catch(e){console.error(e);sync(false,'Ошибка синхронизации')}
-}
+function overview(){const started=isStarted(),pp=getProjectProgress(),sr=started?DATA.sources_list.filter((_,i)=>getSourceStatus(i)==='Готово').length:0,or=started?DATA.owners_ready:0,cb=started?criticalBlockers():0;return `<div class="project-start-card"><div><div class="label">Статус проекта</div><div class="project-state">${started?'Проект запущен':'Не начат'}</div><div id="project-start-at" class="start-meta">Проект еще не начат</div></div><div class="project-clock-wrap"><div class="label">Время в проекте</div><div id="project-timer" class="project-timer">00 дн. 00:00:00</div></div><button id="start-project-btn" class="btn primary start-project-btn">${started?'Проект запущен':'Старт проекта'}</button></div><div class="grid"><div class="card kpi"><div class="label">Готовность проекта</div><div class="value">${pp}%</div>${progress(pp)}<div class="sub">считается по статусам этапов</div></div><div class="card kpi"><div class="label">Источники готовы</div><div class="value">${sr} / ${DATA.sources}</div><div class="sub">статус «Готово»</div></div><div class="card kpi"><div class="label">Владельцы назначены</div><div class="value">${or} / ${DATA.owners}</div><div class="sub">RACI должен быть закрыт</div></div><div class="card kpi"><div class="label">Критические блокеры</div><div class="value">${cb}</div><div class="sub">только активные критические</div></div></div><div class="section-title"><h2>Цель проекта</h2></div><div class="callout"><b>${DATA.goal}</b><br><br>Проект закрывается только после приемки единого рабочего дашборда.</div>`;}
+function gantt(){const ps=isStarted()?Number(localStorage.getItem(START_KEY)):Date.now(),tasks=[['Цели и KPI',0,7],['Команды и владельцы',0,14],['Источники лидов',4,18],['Единая воронка',10,22],['Data Dictionary',15,31],['Сквозные ID',22,38],['Интеграции',31,59],['DWH и модель данных',38,66],['Контроль качества',52,73],['Единый BI-дашборд',59,80],['Валидация с бизнесом',73,85],['Приемка и закрытие',84,90]],tw=Array.from({length:13},(_,i)=>`<div class="gantt-week">Н${i+1}</div>`).join(''),rows=tasks.map(([n,s,e])=>`<div class="gantt-row"><div class="gantt-task"><b>${n}</b><small>${formatDate(addDays(ps,s))} - ${formatDate(addDays(ps,e))}</small></div><div class="gantt-track"><div class="gantt-grid"></div><div class="gantt-bar" style="left:${s/90*100}%;width:${Math.max(2,(e-s)/90*100)}%"></div></div></div>`).join('');return `<div class="section-title"><h2>Диаграмма Ганта</h2><small>План проекта на 3 месяца</small></div><div class="callout"><b>${isStarted()?'Гант рассчитан от фактической даты старта проекта.':'Проект еще не запущен.'}</b></div><div class="gantt-wrap"><div class="gantt-head"><div class="gantt-task-head">Этап</div><div class="gantt-weeks">${tw}</div></div>${rows}</div><div class="gantt-footer"><span>Старт: <b>${formatDate(ps)}</b></span><span>Плановое завершение: <b>${formatDate(addDays(ps,90))}</b></span><span>Срок: <b>3 месяца / 90 дней</b></span></div>`;}
+function roadmap(){const opts=STAGE_STATUSES.map(x=>`<option>${x}</option>`).join('');return `<div class="section-title"><h2>Этапы проекта</h2><small>${isStarted()?'0 → единый дашборд':'Проект еще не начат'}</small></div><table class="table"><thead><tr><th>#</th><th>Этап</th><th>Статус</th><th>Готовность</th></tr></thead><tbody>${DATA.stages.map(s=>`<tr><td>${s.id}</td><td><b>${s.name}</b></td><td><select class="stage-status-select" data-stage-id="${s.id}">${opts}</select></td><td>${getStageProgress(s.id)}% ${progress(getStageProgress(s.id))}</td></tr>`).join('')}</tbody></table>`;}
+function teams(){const opts=RESPONSIBLES.map(x=>`<option>${x}</option>`).join('');return `<div class="section-title"><h2>Команды и RACI</h2><small>R делает · A отвечает · C консультирует · I информируется</small></div><table class="table"><thead><tr><th>Команда</th><th>RACI</th><th>Роль в проекте</th><th>Ответственный</th></tr></thead><tbody>${DATA.teams.map((r,i)=>`<tr><td><b>${r[0]}</b></td><td>${r[1]}</td><td>${r[2]}</td><td><select class="responsible-select" data-team-index="${i}">${opts}</select></td></tr>`).join('')}</tbody></table>`;}
+function sources(){const opts=SOURCE_STATUSES.map(x=>`<option>${x}</option>`).join('');return `<div class="section-title"><h2>Источники данных</h2><small>что собираем и куда передаем</small></div><table class="table"><thead><tr><th>Источник</th><th>Данные</th><th>Целевая связка</th><th>Статус</th></tr></thead><tbody>${DATA.sources_list.map((r,i)=>`<tr><td><b>${r[0]}</b></td><td>${r[1]}</td><td>${r[2]}</td><td><select class="source-status-select" data-source-index="${i}">${opts}</select></td></tr>`).join('')}</tbody></table>`;}
+function funnel(){return `<div class="section-title"><h2>Сквозной путь клиента</h2></div><div class="card"><div class="flow">${['Реклама','Сайт','Метрика','ELMA','Квалификация','Альфа-Авто','Договор','1С / Оплата','DWH','BI Dashboard'].map((x,i)=>`${i?'<div class="arrow">→</div>':''}<div class="node"><b>${x}</b></div>`).join('')}</div></div>`;}
+function dictionary(){return `<div class="section-title"><h2>Data Dictionary</h2><small>минимальный набор для связки</small></div><table class="table"><thead><tr><th>Поле</th><th>Система</th><th>Назначение</th><th>Класс</th><th>Готовность</th></tr></thead><tbody>${DATA.dictionary.map((r,i)=>`<tr><td><b>${r[0]}</b></td><td>${r[1]}</td><td>${r[2]}</td><td><span class="badge ${r[3]==='critical'?'bad':'work'}">${r[3]==='critical'?'Критично':'Обязательно'}</span></td><td><label><input type="checkbox" class="dictionary-ready" data-dictionary-index="${i}" ${getDictionaryReady(i)?'checked':''}> <span>${getDictionaryReady(i)?'Готово':'Не готово'}</span></label></td></tr>`).join('')}</tbody></table>`;}
+function issues(){const list=getBlockers(),rows=list.map(b=>`<tr><td>${esc(b.source)}</td><td>${esc(b.description)}</td><td><select class="blocker-severity" data-id="${b.id}">${BLOCKER_SEVERITY.map(x=>`<option ${x===b.severity?'selected':''}>${x}</option>`).join('')}</select></td><td>${esc(b.owner)}</td><td>${esc(b.due||'')}</td><td><select class="blocker-status" data-id="${b.id}">${BLOCKER_STATUSES.map(x=>`<option ${x===b.status?'selected':''}>${x}</option>`).join('')}</select></td><td>${esc(b.comment||'')}</td><td><button class="delete-blocker" data-id="${b.id}">Удалить</button></td></tr>`).join('');return `<div class="section-title"><h2>Критические блокеры</h2><small>активных: ${activeBlockers().length}, критических: ${criticalBlockers()}</small></div><div class="callout"><b>Логика:</b> блокер можно добавить вручную или он создается автоматически, если у этапа или источника выбран статус «Блокер».</div><div class="card"><h3>+ Добавить блокер</h3><div style="display:grid;grid-template-columns:1.2fr 2fr 1fr 1fr 1fr;gap:10px"><input id="bl-source" placeholder="Этап / источник"><input id="bl-desc" placeholder="Описание проблемы"><select id="bl-severity">${BLOCKER_SEVERITY.map(x=>`<option>${x}</option>`).join('')}</select><select id="bl-owner">${RESPONSIBLES.map(x=>`<option>${x}</option>`).join('')}</select><input id="bl-due" type="date"></div><textarea id="bl-comment" placeholder="Комментарий / что блокирует" style="width:100%;margin-top:10px"></textarea><button id="add-blocker" class="btn primary" style="margin-top:10px">Создать блокер</button></div>${list.length?`<table class="table"><thead><tr><th>Этап / источник</th><th>Проблема</th><th>Критичность</th><th>Ответственный</th><th>Срок</th><th>Статус</th><th>Комментарий</th><th></th></tr></thead><tbody>${rows}</tbody></table>`:'<div class="callout">Блокеров пока нет.</div>'}`;}
+function dod(){return `<div class="section-title"><h2>Definition of Done</h2></div><div class="checklist">${DATA.dod.map((x,i)=>`<label class="check"><input type="checkbox" data-key="dod-${i}" ${isStarted()?'':'disabled'}><span><b>${i+1}.</b> ${x}</span></label>`).join('')}</div>`;}
 
-function render(){
-  const active=state.tasks.filter(x=>x.status!=='done');
-  const overdue=active.filter(x=>x.due_date&&x.due_date<today()).length;
-  const done=state.tasks.filter(x=>x.status==='done').length;
-  const ready=state.tasks.length?Math.round(done/state.tasks.length*100):0;
-  metricTasks.textContent=state.tasks.length;
-  metricInProgress.textContent=state.tasks.filter(x=>x.status==='in_progress').length;
-  metricOverdue.textContent=overdue;
-  metricBlockers.textContent=state.blockers.filter(x=>x.status!=='resolved').length;
-  metricLeads.textContent=state.leads.length;
-  metricReadiness.textContent=ready+'%';
-  readinessBar.style.width=ready+'%';
-
-  ['backlog','planned','in_progress','review','done'].forEach(s=>{
-    const list=state.tasks.filter(x=>x.status===s);
-    document.getElementById('count-'+s).textContent=list.length;
-    document.getElementById('col-'+s).innerHTML=list.map(x=>`<article class="task-card" draggable="true" data-task-id="${x.id}"><h4>${esc(x.title)}</h4><div class="task-meta">${x.direction?`<span>${esc(x.direction)}</span>`:''}${x.owner?`<span>${esc(x.owner)}</span>`:''}${x.due_date?`<span>до ${date(x.due_date)}</span>`:''}</div></article>`).join('')||'<div class="column-empty">Нет задач</div>';
-  });
-
-  leadsTable.innerHTML=state.leads.map(x=>`<tr><td><strong>${esc(x.company)}</strong></td><td>${esc(x.contact||'')}</td><td>${esc(x.source||'')}</td><td>${esc(x.stage||'')}</td><td>${esc(x.manager||'')}</td><td>${esc(x.next_action||'')}</td><td></td></tr>`).join('')||'<tr><td colspan="7" class="table-empty">Лидов пока нет</td></tr>';
-  blockersList.innerHTML=state.blockers.map(x=>`<article class="blocker-card"><div><h3>${esc(x.title)}</h3><p>${esc(x.description||'')}</p></div></article>`).join('')||'<div class="panel empty-state">Блокеров пока нет</div>';
-  meetingsTable.innerHTML=state.meetings.map(x=>`<tr><td>${new Date(x.meeting_date).toLocaleString('ru-RU')}</td><td>${esc(x.team)}</td><td>${esc(x.agenda||'')}</td><td>${esc(x.result||'')}</td><td>${esc(x.next_steps||'')}</td><td></td></tr>`).join('')||'<tr><td colspan="6" class="table-empty">Встреч пока нет</td></tr>';
-
-  bindDnD();
-}
-
-function bindDnD(){
-  document.querySelectorAll('.task-card').forEach(c=>c.ondragstart=e=>e.dataTransfer.setData('text/plain',c.dataset.taskId));
-  document.querySelectorAll('.kanban-column').forEach(c=>{
-    c.ondragover=e=>e.preventDefault();
-    c.ondrop=async e=>{e.preventDefault();await send('ca_tasks','PATCH',{status:c.dataset.status,updated_at:new Date().toISOString()},`id=eq.${e.dataTransfer.getData('text/plain')}`);load()};
-  });
-}
-
-document.querySelectorAll('.nav-btn').forEach(b=>b.onclick=()=>{
-  document.querySelectorAll('.nav-btn').forEach(x=>x.classList.remove('active'));
-  document.querySelectorAll('.section').forEach(x=>x.classList.remove('active-section'));
-  b.classList.add('active');document.getElementById(b.dataset.section).classList.add('active-section');
-});
-document.querySelectorAll('[data-open-modal]').forEach(b=>b.onclick=()=>document.getElementById(b.dataset.openModal).classList.add('open'));
-document.querySelectorAll('[data-close-modal]').forEach(b=>b.onclick=()=>b.closest('.modal').classList.remove('open'));
-
-function values(f){return Object.fromEntries(new FormData(f).entries())}
-taskForm.onsubmit=async e=>{e.preventDefault();const x=values(e.target);await send('ca_tasks','POST',x);e.target.reset();e.target.closest('.modal').classList.remove('open');load()};
-leadForm.onsubmit=async e=>{e.preventDefault();const x=values(e.target);await send('ca_leads','POST',x);e.target.reset();e.target.closest('.modal').classList.remove('open');load()};
-blockerForm.onsubmit=async e=>{e.preventDefault();const x=values(e.target);await send('ca_blockers','POST',x);e.target.reset();e.target.closest('.modal').classList.remove('open');load()};
-meetingForm.onsubmit=async e=>{e.preventDefault();const x=values(e.target);x.meeting_date=new Date(x.meeting_date).toISOString();await send('ca_meetings','POST',x);e.target.reset();e.target.closest('.modal').classList.remove('open');load()};
-refreshBtn.onclick=load;
-load();
+function ensureAutoBlocker(source,description){let a=getBlockers();if(a.some(x=>x.autoKey===source&&!['Решен','Закрыт'].includes(x.status)))return;a.push({id:Date.now(),autoKey:source,source,description,severity:'Высокая',owner:'Не назначен',due:'',status:'Открыт',comment:'Создан автоматически по статусу «Блокер»',createdAt:new Date().toISOString()});saveBlockers(a);}
+function bindStageStatuses(){document.querySelectorAll('.stage-status-select').forEach(el=>{const id=el.dataset.stageId;el.value=getStageStatus(id);el.addEventListener('change',()=>{localStorage.setItem(`atom-stage-status-${id}`,el.value);if(el.value==='Блокер'){const s=DATA.stages.find(x=>String(x.id)===String(id));ensureAutoBlocker(`Этап: ${s?.name||id}`,'Этап переведен в статус «Блокер»');}render('roadmap');});});}
+function bindSourceStatuses(){document.querySelectorAll('.source-status-select').forEach(el=>{const id=el.dataset.sourceIndex;el.value=getSourceStatus(id);el.addEventListener('change',()=>{localStorage.setItem(`atom-source-status-${id}`,el.value);if(el.value==='Блокер'){const s=DATA.sources_list[Number(id)];ensureAutoBlocker(`Источник: ${s?.[0]||id}`,'Источник переведен в статус «Блокер»');}render('sources');});});}
+function bindDictionaryReady(){document.querySelectorAll('.dictionary-ready').forEach(el=>el.addEventListener('change',()=>{const id=el.dataset.dictionaryIndex;localStorage.setItem(`atom-dictionary-ready-${id}`,el.checked?'1':'0');if(el.nextElementSibling)el.nextElementSibling.textContent=el.checked?'Готово':'Не готово';}));}
+function bindResponsibles(){document.querySelectorAll('.responsible-select').forEach(el=>{const k=`atom-responsible-${el.dataset.teamIndex}`,s=localStorage.getItem(k);el.value=s&&RESPONSIBLES.includes(s)?s:'Не назначен';el.addEventListener('change',()=>localStorage.setItem(k,el.value));});}
+function bindBlockers(){const add=document.getElementById('add-blocker');if(add)add.addEventListener('click',()=>{const source=document.getElementById('bl-source').value.trim(),description=document.getElementById('bl-desc').value.trim();if(!source||!description)return alert('Заполни этап/источник и описание проблемы');const a=getBlockers();a.push({id:Date.now(),source,description,severity:document.getElementById('bl-severity').value,owner:document.getElementById('bl-owner').value,due:document.getElementById('bl-due').value,status:'Открыт',comment:document.getElementById('bl-comment').value.trim(),createdAt:new Date().toISOString()});saveBlockers(a);render('issues');});document.querySelectorAll('.blocker-status').forEach(el=>el.addEventListener('change',()=>{const a=getBlockers(),b=a.find(x=>String(x.id)===el.dataset.id);if(b)b.status=el.value;saveBlockers(a);render('issues');}));document.querySelectorAll('.blocker-severity').forEach(el=>el.addEventListener('change',()=>{const a=getBlockers(),b=a.find(x=>String(x.id)===el.dataset.id);if(b)b.severity=el.value;saveBlockers(a);render('issues');}));document.querySelectorAll('.delete-blocker').forEach(el=>el.addEventListener('click',()=>{saveBlockers(getBlockers().filter(x=>String(x.id)!==el.dataset.id));render('issues');}));}
+function bindChecks(){document.querySelectorAll('input[type=checkbox][data-key]').forEach(el=>{const k='atom-mvp-'+el.dataset.key;el.checked=localStorage.getItem(k)==='1';el.addEventListener('change',()=>localStorage.setItem(k,el.checked?'1':'0'));});}
