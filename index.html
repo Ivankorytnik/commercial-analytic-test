@@ -13,6 +13,11 @@
     .nav-info-separator{margin:18px 8px 8px;padding:14px 6px 0;border-top:1px solid #dbe5e5;color:#8a9b9c;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
     .nav-info-separator~.nav{background:#f7f9f9;color:#5b7071;border-left:2px solid transparent;font-size:13px}
     .nav-info-separator~.nav:hover,.nav-info-separator~.nav.active{background:#eef5f4;color:#294343;border-left-color:#35d8c7;font-weight:700}
+    .header-status{flex-direction:row;align-items:center;justify-content:flex-end;gap:10px;min-width:0;flex-wrap:nowrap}
+    .project-progress-box{width:220px;flex:0 0 220px;padding:10px 12px}
+    .status-pill{white-space:nowrap;flex:0 0 auto}
+    @media(max-width:1100px){.topbar{flex-direction:column}.header-status{width:100%;justify-content:flex-start;flex-wrap:wrap}.project-progress-box{width:220px}}
+    @media(max-width:600px){.header-status{align-items:flex-start}.project-progress-box{width:100%;flex-basis:100%}}
   </style>
 </head>
 <body>
@@ -22,8 +27,8 @@
       <h1>Контроль готовности проекта коммерческой аналитики</h1>
       <p>Контрольный центр проекта до запуска единого сквозного дашборда</p>
       <div class="build-meta">
-        <span>Версия <b>v1.2.1 LOGIC CORE FAST</b></span>
-        <span>Обновлено <b>10.09.2026 · 21:24</b></span>
+        <span>Версия <b>v1.2.2 LOGIC CORE FAST</b></span>
+        <span>Обновлено <b>10.09.2026 · 21:30</b></span>
       </div>
     </div>
     <div class="header-status">
