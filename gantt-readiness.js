@@ -303,7 +303,7 @@
       const statusText = state.overdue ? 'Просрочка / Блокер' : state.status;
       const transferButton = isStarted()
         ? `<button class="btn gantt-reschedule-btn" data-id="${state.id}" style="margin-top:6px;padding:5px 8px;font-size:11px">Изменить срок</button>`
-        : '';
+        : `<div style="margin-top:6px"><button class="btn gantt-reschedule-btn" data-id="${state.id}" disabled aria-disabled="true" title="Сроки доступны после старта проекта" style="padding:5px 8px;font-size:11px;opacity:.5;cursor:not-allowed">Изменить срок</button><small style="display:block;margin-top:4px;color:#8a9696">Сроки доступны после старта проекта</small></div>`;
       const overdueNote = state.overdue ? `<small style="color:#a53636;font-weight:700">Просрочено. Актуальный срок: ${dueText}</small>` : '';
 
       let barHtml;
@@ -343,7 +343,7 @@
     </div>`;
 
     return `<div class="section-title"><h2>Диаграмма Ганта</h2><small>Базовые и продленные сроки отображаются отдельно</small></div>
-      <div class="callout"><b>${isStarted() ? 'Срок любого этапа можно изменить.' : 'Проект еще не запущен.'}</b> ${isStarted() ? 'Если новый срок позже базового, добавленная часть полосы показывается штриховкой и этап получает отметку «ПРОДЛЕН». Причина продления обязательна.' : 'После старта проекта появятся кнопки изменения сроков.'}</div>
+      <div class="callout"><b>${isStarted() ? 'Срок любого этапа можно изменить.' : 'Проект еще не запущен.'}</b> ${isStarted() ? 'Если новый срок позже базового, добавленная часть полосы показывается штриховкой и этап получает отметку «ПРОДЛЕН». Причина продления обязательна.' : 'Кнопки изменения срока уже видны, но станут активными после нажатия «Старт проекта».'}</div>
       ${legend}
       <div class="gantt-wrap">
         <div class="gantt-head"><div class="gantt-task-head">Этап</div><div class="gantt-weeks" style="grid-template-columns:repeat(${weeks},1fr)">${weekHeaders}</div></div>
@@ -355,6 +355,7 @@
   document.addEventListener('click', event => {
     const toggle = event.target.closest('.gantt-reschedule-btn');
     if (toggle) {
+      if (toggle.disabled) return;
       const form = document.querySelector(`[data-reschedule-form="${toggle.dataset.id}"]`);
       if (form) form.style.display = form.style.display === 'none' ? 'block' : 'none';
       return;
