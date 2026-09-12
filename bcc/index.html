@@ -3,79 +3,57 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#0b1215" />
-  <title>ATOM Business Control Center</title>
-  <link rel="stylesheet" href="./styles.css" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>ATOM BCC | Управление внедрением</title>
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg?v=bcc-020" />
+  <link rel="stylesheet" href="./styles.css?v=0.2.0" />
 </head>
 <body>
-  <div class="app-shell">
-    <aside class="sidebar" id="sidebar">
-      <div class="brand">
-        <div class="brand-mark">A</div>
-        <div>
-          <div class="brand-name">ATOM BCC</div>
-          <div class="brand-sub">Business Control Center</div>
-        </div>
+  <header class="topbar">
+    <div>
+      <div class="eyebrow">АТОМ · Business Control Center</div>
+      <h1>Управление внедрением ATOM BCC</h1>
+      <p>Единый центр управления внедрением Business Control Center</p>
+      <div class="build-meta">
+        <span>Версия <b>v0.2.0 IMPLEMENTATION</b></span>
+        <span>Обновлено <b>12.09.2026</b></span>
       </div>
-
-      <nav class="nav" id="nav">
-        <button class="nav-item active" data-view="dashboard"><span>⌂</span>Главная</button>
-        <button class="nav-item" data-view="tasks"><span>✓</span>Мои задачи</button>
-        <button class="nav-item" data-view="projects"><span>▦</span>Проекты</button>
-        <button class="nav-item" data-view="meetings"><span>◷</span>Встречи</button>
-        <button class="nav-item" data-view="kpi"><span>◉</span>KPI</button>
-        <button class="nav-item" data-view="blockers"><span>!</span>Блокеры</button>
-        <button class="nav-item" data-view="decisions"><span>?</span>Решения</button>
-        <button class="nav-item" data-view="teams"><span>◎</span>Команды</button>
-        <button class="nav-item" data-view="reports"><span>≡</span>Отчеты</button>
-        <button class="nav-item" data-view="directories"><span>⚙</span>Справочники</button>
-      </nav>
-
-      <div class="sidebar-footer">
-        <div class="env-pill">TEST</div>
-        <div class="version">MVP 0.1.0</div>
+    </div>
+    <div class="header-status">
+      <div class="project-progress-box">
+        <span class="project-progress-label">Выполнение проекта</span>
+        <strong id="header-progress">0%</strong>
+        <div class="header-progress-track"><div id="header-progress-bar"></div></div>
       </div>
+      <div class="status-pill">TEST · CLOUD SYNC</div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <button class="nav active" data-view="overview">Обзор</button>
+      <button class="nav" data-view="gantt">Диаграмма Ганта</button>
+      <button class="nav" data-view="roadmap">Этапы внедрения</button>
+      <button class="nav" data-view="teams">Команды и RACI</button>
+      <button class="nav" data-view="modules">Модули BCC</button>
+      <button class="nav" data-view="issues">Блокеры</button>
+      <button class="nav" data-view="dod">Definition of Done</button>
+
+      <div class="nav-info-separator">Информация</div>
+      <button class="nav" data-view="architecture">Архитектура BCC</button>
     </aside>
 
-    <main class="main">
-      <header class="topbar">
-        <div class="topbar-left">
-          <button class="icon-btn mobile-only" id="menuBtn" aria-label="Меню">☰</button>
-          <div>
-            <h1 id="pageTitle">Главная</h1>
-            <p id="pageSubtitle">Что требует внимания сегодня</p>
-          </div>
-        </div>
-        <div class="topbar-actions">
-          <button class="btn secondary" id="exportBtn">Экспорт</button>
-          <label class="btn secondary file-label">Импорт<input type="file" id="importInput" accept="application/json" hidden></label>
-          <button class="btn primary" id="quickAddBtn">+ Добавить</button>
-        </div>
-      </header>
+    <section class="content">
+      <div id="app"><div class="callout">Загрузка данных ATOM BCC...</div></div>
+    </section>
+  </main>
 
-      <div class="public-warning">
-        <strong>Тестовый публичный контур.</strong> Не вводите конфиденциальные данные АО «КАМА» и персональные данные сотрудников.
-      </div>
+  <footer>Тестовая версия. Не размещайте конфиденциальные данные АО «КАМА» и персональные данные. Состояние проекта синхронизируется через тестовое облачное хранилище.</footer>
 
-      <section id="content" class="content"></section>
-    </main>
-  </div>
-
-  <div class="modal-backdrop hidden" id="modalBackdrop">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <div class="modal-header">
-        <div>
-          <div class="eyebrow">ATOM BCC</div>
-          <h2 id="modalTitle">Добавить</h2>
-        </div>
-        <button class="icon-btn" id="closeModalBtn" aria-label="Закрыть">×</button>
-      </div>
-      <form id="entityForm" class="form-grid"></form>
-    </div>
-  </div>
-
-  <div id="toast" class="toast hidden"></div>
-
-  <script src="./app.js"></script>
+  <script src="../sync-status.js?v=1.2.1"></script>
+  <script src="../sync-storage.js?v=2.1.0"></script>
+  <script src="./app.js?v=0.2.0"></script>
 </body>
 </html>
