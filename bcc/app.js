@@ -1,128 +1,84 @@
-const STORAGE_KEY='atom-bcc-mvp-v01';
-const state=loadState();
-let currentView='dashboard';
-const titles={dashboard:['Главная','Что требует внимания сегодня'],tasks:['Мои задачи','Контроль исполнения'],projects:['Проекты','Портфель ключевых инициатив'],meetings:['Встречи','Адженда, решения и обязательства'],kpi:['KPI','План, факт и прогноз'],blockers:['Блокеры','Что мешает движению'],decisions:['Решения','Что требует управленческого решения'],teams:['Команды','Ответственные и зоны ответственности'],reports:['Отчеты','Еженедельный контроль'],directories:['Справочники','Управление вариантами и статусами']};
+const START_KEY='atom-bcc-started-at';
+const STAGES_KEY='atom-bcc-stage-statuses-v02';
+const TEAMS_KEY='atom-bcc-team-owners-v02';
+const MODULES_KEY='atom-bcc-module-statuses-v02';
+const BLOCKERS_KEY='atom-bcc-blockers-v02';
+const DOD_KEY='atom-bcc-dod-v02';
+const app=document.getElementById('app');
+let currentView='overview';
+let timerHandle=null;
 
-function seed(){return {
- projects:[
-  {id:id(),name:'Коммерческая аналитика',owner:'Коммерческий блок',status:'В работе',progress:48,deadline:'2026-10-30',priority:'Высокий'},
-  {id:id(),name:'B2B продажи',owner:'Корпоративные продажи',status:'В работе',progress:62,deadline:'2026-11-30',priority:'Высокий'},
-  {id:id(),name:'Контур тест-драйвов',owner:'Продажи / IT',status:'Под риском',progress:35,deadline:'2026-10-15',priority:'Средний'}],
- tasks:[
-  {id:id(),title:'Собрать владельцев источников данных',project:'Коммерческая аналитика',owner:'Иван',status:'В работе',priority:'Высокий',deadline:'2026-09-14'},
-  {id:id(),title:'Зафиксировать поля лида в ELMA',project:'Коммерческая аналитика',owner:'Иван',status:'Новая',priority:'Высокий',deadline:'2026-09-16'},
-  {id:id(),title:'Подготовить недельную сводку',project:'B2B продажи',owner:'Иван',status:'Новая',priority:'Средний',deadline:'2026-09-18'}],
- meetings:[
-  {id:id(),title:'ELMA: путь лида',date:'2026-09-14',owner:'Коммерческая аналитика',status:'Запланирована',result:''},
-  {id:id(),title:'Метрики сайта и источники',date:'2026-09-15',owner:'Маркетинг / Аналитика',status:'Запланирована',result:''}],
- kpi:[
-  {id:id(),name:'Источники данных описаны',owner:'Коммерческая аналитика',plan:100,fact:45,unit:'%'},
-  {id:id(),name:'Владельцы данных определены',owner:'Коммерческая аналитика',plan:12,fact:7,unit:'команд'},
-  {id:id(),name:'Критические блокеры закрыты',owner:'Проект',plan:100,fact:60,unit:'%'}],
- blockers:[
-  {id:id(),title:'Нет единого владельца схемы передачи лида ELMA → Альфа-Авто',owner:'IT / Бизнес',impact:'Высокое',deadline:'2026-09-17',status:'Открыт'},
-  {id:id(),title:'Не утвержден Data Dictionary',owner:'DATA',impact:'Среднее',deadline:'2026-09-19',status:'Открыт'}],
- decisions:[
-  {id:id(),title:'Утвердить единый набор обязательных полей лида',owner:'Коммерческий директор',deadline:'2026-09-18',status:'Ожидает решения',priority:'Высокий'},
-  {id:id(),title:'Определить владельца качества данных',owner:'Коммерческий директор',deadline:'2026-09-20',status:'Ожидает решения',priority:'Средний'}],
+const STAGE_STATUSES=['Не начато','Подготовка','В работе','Ожидание','На согласовании','Блокер','Завершено'];
+const MODULE_STATUSES=['Не начато','Проектирование','Разработка','Тестирование','Пилот','Готово','Блокер'];
+const BLOCKER_STATUSES=['Открыт','В работе','Ожидаем ответ','На эскалации','Решен','Закрыт'];
+const SEVERITY=['Низкая','Средняя','Высокая','Критическая'];
+const PROGRESS={'Не начато':0,'Подготовка':10,'Проектирование':20,'В работе':45,'Разработка':45,'Ожидание':50,'На согласовании':70,'Тестирование':70,'Пилот':85,'Блокер':50,'Завершено':100,'Готово':100};
+
+const DATA={
+ goal:'Внедрить единый Business Control Center, в котором руководство и владельцы процессов видят проекты, задачи, встречи, KPI, решения, блокеры и статус исполнения в одном рабочем контуре.',
+ stages:[
+  ['1','Цели, границы и владелец BCC'],['2','Роли пользователей и RACI'],['3','Справочники и единая модель статусов'],['4','Портфель проектов и инициатив'],['5','Задачи, сроки и контроль исполнения'],['6','Встречи, решения и обязательства'],['7','KPI и управленческие показатели'],['8','Блокеры и эскалации'],['9','Еженедельная управленческая отчетность'],['10','Облачная синхронизация и права доступа'],['11','Пилот с рабочими командами'],['12','Приемка и переход в рабочий контур']
+ ],
  teams:[
-  {id:id(),name:'Коммерческий блок',lead:'Коммерческий директор',area:'Приоритеты, KPI, решения'},
-  {id:id(),name:'ELMA / CRM',lead:'Не назначен',area:'Лид, квалификация, интеграции'},
-  {id:id(),name:'DATA / DWH / BI',lead:'Не назначен',area:'Модель данных, витрины, отчетность'},
-  {id:id(),name:'Маркетинг / Метрики',lead:'Не назначен',area:'Источники, UTM, сайт, аналитика'}],
- directories:{taskStatuses:['Новая','В работе','На проверке','Готово','Отложено'],projectStatuses:['План','В работе','Под риском','Завершен'],priorities:['Низкий','Средний','Высокий','Критический']}
-};}
-function id(){return Math.random().toString(36).slice(2,10)}
-function loadState(){try{const x=localStorage.getItem(STORAGE_KEY);return x?JSON.parse(x):seed()}catch(e){return seed()}}
-function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}
-function esc(v=''){return String(v).replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[s]))}
-function fmtDate(v){if(!v)return '—';const d=new Date(v+'T00:00:00');return new Intl.DateTimeFormat('ru-RU').format(d)}
-function daysTo(v){const t=new Date(v+'T23:59:59'),n=new Date();return Math.ceil((t-n)/86400000)}
-function badge(text){const s=String(text).toLowerCase();let c='';if(s.includes('готов')||s.includes('заверш')||s.includes('закры'))c='ok';else if(s.includes('риск')||s.includes('ожида')||s.includes('сред'))c='warn';else if(s.includes('крит')||s.includes('проср')||s.includes('высок'))c='danger';return `<span class="badge ${c}">${esc(text)}</span>`}
-
-const content=document.getElementById('content');
-const nav=document.getElementById('nav');
-nav.addEventListener('click',e=>{const b=e.target.closest('[data-view]');if(!b)return;document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));b.classList.add('active');currentView=b.dataset.view;render();document.getElementById('sidebar').classList.remove('open')});
-document.getElementById('menuBtn').onclick=()=>document.getElementById('sidebar').classList.toggle('open');
-document.getElementById('quickAddBtn').onclick=()=>openEntityModal(currentView==='dashboard'?'tasks':currentView);
-document.getElementById('closeModalBtn').onclick=closeModal;
-document.getElementById('modalBackdrop').addEventListener('click',e=>{if(e.target.id==='modalBackdrop')closeModal()});
-document.getElementById('exportBtn').onclick=exportData;
-document.getElementById('importInput').addEventListener('change',importData);
-
-function render(){const [t,s]=titles[currentView];document.getElementById('pageTitle').textContent=t;document.getElementById('pageSubtitle').textContent=s;const fn={dashboard:renderDashboard,tasks:()=>renderCollection('tasks'),projects:()=>renderCollection('projects'),meetings:()=>renderCollection('meetings'),kpi:renderKpi,blockers:()=>renderCollection('blockers'),decisions:()=>renderCollection('decisions'),teams:()=>renderCollection('teams'),reports:renderReports,directories:renderDirectories}[currentView];fn();}
-
-function renderDashboard(){
- const openBlockers=state.blockers.filter(x=>x.status!=='Закрыт').length;
- const waiting=state.decisions.filter(x=>x.status.includes('Ожида')).length;
- const overdue=state.tasks.filter(x=>x.status!=='Готово'&&daysTo(x.deadline)<0).length;
- const todayTasks=state.tasks.filter(x=>x.status!=='Готово').length;
- const avg=state.projects.length?Math.round(state.projects.reduce((a,b)=>a+Number(b.progress||0),0)/state.projects.length):0;
- content.innerHTML=`<div class="grid metrics">
- ${metric('Активные проекты',state.projects.filter(x=>x.status!=='Завершен').length,'портфель')}
- ${metric('Открытые задачи',todayTasks,overdue?`${overdue} просрочено`:'без просрочек')}
- ${metric('Блокеры',openBlockers,'требуют контроля')}
- ${metric('Решения',waiting,'ожидают руководителя')}
- ${metric('Готовность портфеля',avg+'%','средний прогресс')}
- </div>
- <div class="grid two-col">
-  <div class="card"><div class="section-head"><h3>Сегодня в фокусе</h3><button class="btn secondary" onclick="go('tasks')">Все задачи</button></div>${focusTasks()}</div>
-  <div class="card"><div class="section-head"><h3>Требуют решения</h3><button class="btn secondary" onclick="go('decisions')">Все решения</button></div>${decisionList()}</div>
- </div>
- <div class="grid two-col">
-  <div class="card"><div class="section-head"><h3>Портфель проектов</h3><button class="btn secondary" onclick="go('projects')">Все проекты</button></div>${projectList()}</div>
-  <div class="card"><div class="section-head"><h3>Критические блокеры</h3><button class="btn secondary" onclick="go('blockers')">Все блокеры</button></div>${blockerList()}</div>
- </div>`;
-}
-function metric(l,v,n){return `<div class="metric"><div class="metric-label">${esc(l)}</div><div class="metric-value">${esc(v)}</div><div class="metric-note">${esc(n)}</div></div>`}
-function focusTasks(){const arr=[...state.tasks].sort((a,b)=>new Date(a.deadline)-new Date(b.deadline)).slice(0,6);return arr.length?`<div class="list">${arr.map(x=>`<div class="list-item"><div class="section-head"><div class="list-title">${esc(x.title)}</div>${badge(x.priority)}</div><div class="list-meta">${esc(x.project)} · ${esc(x.owner)} · до ${fmtDate(x.deadline)}</div></div>`).join('')}</div>`:'<div class="empty">Задач нет</div>'}
-function decisionList(){return state.decisions.length?`<div class="list">${state.decisions.slice(0,5).map(x=>`<div class="list-item"><div class="list-title">${esc(x.title)}</div><div class="list-meta">${esc(x.owner)} · до ${fmtDate(x.deadline)}</div></div>`).join('')}</div>`:'<div class="empty">Нет решений</div>'}
-function projectList(){return state.projects.length?`<div class="list">${state.projects.slice(0,5).map(x=>`<div class="list-item"><div class="section-head"><div class="list-title">${esc(x.name)}</div>${badge(x.status)}</div><div class="list-meta">${esc(x.owner)} · ${x.progress}%</div><div class="progress"><span style="width:${Math.min(100,Math.max(0,x.progress))}%"></span></div></div>`).join('')}</div>`:'<div class="empty">Нет проектов</div>'}
-function blockerList(){return state.blockers.length?`<div class="list">${state.blockers.slice(0,5).map(x=>`<div class="list-item"><div class="section-head"><div class="list-title">${esc(x.title)}</div>${badge(x.impact)}</div><div class="list-meta">${esc(x.owner)} · срок ${fmtDate(x.deadline)}</div></div>`).join('')}</div>`:'<div class="empty">Нет блокеров</div>'}
-
-function renderCollection(type){
- const configs={
- tasks:{title:'Задачи',heads:['Задача','Проект','Ответственный','Статус','Приоритет','Срок'],row:x=>[x.title,x.project,x.owner,badge(x.status),badge(x.priority),fmtDate(x.deadline)]},
- projects:{title:'Проекты',heads:['Проект','Владелец','Статус','Прогресс','Приоритет','Срок'],row:x=>[x.name,x.owner,badge(x.status),x.progress+'%',badge(x.priority),fmtDate(x.deadline)]},
- meetings:{title:'Встречи',heads:['Встреча','Дата','Команда','Статус','Результат'],row:x=>[x.title,fmtDate(x.date),x.owner,badge(x.status),x.result||'—']},
- blockers:{title:'Блокеры',heads:['Блокер','Ответственный','Влияние','Статус','Срок'],row:x=>[x.title,x.owner,badge(x.impact),badge(x.status),fmtDate(x.deadline)]},
- decisions:{title:'Решения',heads:['Вопрос','Кто решает','Приоритет','Статус','Срок'],row:x=>[x.title,x.owner,badge(x.priority),badge(x.status),fmtDate(x.deadline)]},
- teams:{title:'Команды',heads:['Команда','Руководитель / владелец','Зона ответственности'],row:x=>[x.name,x.lead,x.area]}
- };
- const c=configs[type],arr=state[type];
- content.innerHTML=`<div class="card"><div class="section-head"><h3>${c.title}</h3><button class="btn primary" onclick="openEntityModal('${type}')">+ Добавить</button></div><div class="toolbar"><input id="searchInput" placeholder="Поиск..." /></div><div id="tableWrap">${tableHtml(c,arr,type)}</div></div>`;
- document.getElementById('searchInput').addEventListener('input',e=>{const q=e.target.value.toLowerCase();const f=arr.filter(o=>Object.values(o).join(' ').toLowerCase().includes(q));document.getElementById('tableWrap').innerHTML=tableHtml(c,f,type)});
-}
-function tableHtml(c,arr,type){return arr.length?`<table class="table"><thead><tr>${c.heads.map(h=>`<th>${h}</th>`).join('')}<th></th></tr></thead><tbody>${arr.map(x=>`<tr>${c.row(x).map(v=>`<td>${v}</td>`).join('')}<td><button class="btn secondary" onclick="removeItem('${type}','${x.id}')">Удалить</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Пока пусто</div>'}
-
-function renderKpi(){content.innerHTML=`<div class="card"><div class="section-head"><h3>KPI</h3><button class="btn primary" onclick="openEntityModal('kpi')">+ Добавить KPI</button></div><div class="grid two-col">${state.kpi.map(x=>{const p=x.plan?Math.min(100,Math.round(x.fact/x.plan*100)):0;return `<div class="list-item"><div class="section-head"><div class="list-title">${esc(x.name)}</div><b>${p}%</b></div><div class="list-meta">${esc(x.owner)} · план ${esc(x.plan)} ${esc(x.unit)} · факт ${esc(x.fact)} ${esc(x.unit)}</div><div class="progress"><span style="width:${p}%"></span></div><div style="margin-top:10px"><button class="btn secondary" onclick="removeItem('kpi','${x.id}')">Удалить</button></div></div>`}).join('')}</div></div>`}
-function renderReports(){
- const done=state.tasks.filter(x=>x.status==='Готово').length,total=state.tasks.length,open=total-done;
- content.innerHTML=`<div class="grid two-col"><div class="card"><h3>Недельная управленческая сводка</h3><div class="list"><div class="list-item"><div class="list-title">Что сделано</div><div class="list-meta">Закрыто задач: ${done}. Средняя готовность проектов: ${Math.round(state.projects.reduce((a,b)=>a+Number(b.progress||0),0)/(state.projects.length||1))}%.</div></div><div class="list-item"><div class="list-title">Что в работе</div><div class="list-meta">Открыто задач: ${open}. Активных проектов: ${state.projects.filter(x=>x.status!=='Завершен').length}.</div></div><div class="list-item"><div class="list-title">Что мешает</div><div class="list-meta">Открытых блокеров: ${state.blockers.filter(x=>x.status!=='Закрыт').length}.</div></div><div class="list-item"><div class="list-title">Что требует решения</div><div class="list-meta">Управленческих решений: ${state.decisions.filter(x=>x.status.includes('Ожида')).length}.</div></div></div></div><div class="card"><h3>Логика отчета</h3><div class="list"><div class="list-item">1. Что обещали на прошлой неделе</div><div class="list-item">2. Что выполнено и не выполнено</div><div class="list-item">3. Причины отклонений</div><div class="list-item">4. План следующей недели</div><div class="list-item">5. Решения, нужные от руководителя</div></div></div></div>`
-}
-function renderDirectories(){const d=state.directories;content.innerHTML=`<div class="grid two-col">${dirCard('Статусы задач','taskStatuses',d.taskStatuses)}${dirCard('Статусы проектов','projectStatuses',d.projectStatuses)}${dirCard('Приоритеты','priorities',d.priorities)}</div>`}
-function dirCard(title,key,arr){return `<div class="card"><h3>${title}</h3><div class="list">${arr.map((x,i)=>`<div class="list-item section-head"><span>${esc(x)}</span><button class="btn secondary" onclick="removeDirectory('${key}',${i})">Удалить</button></div>`).join('')}</div><div class="toolbar" style="margin-top:12px"><input id="dir-${key}" placeholder="Новый вариант"><button class="btn primary" onclick="addDirectory('${key}')">Добавить</button></div></div>`}
-
-window.go=function(v){currentView=v;document.querySelectorAll('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.view===v));render()}
-window.removeItem=function(type,itemId){state[type]=state[type].filter(x=>x.id!==itemId);save();render();toast('Удалено')}
-window.addDirectory=function(key){const el=document.getElementById('dir-'+key);const v=el.value.trim();if(!v)return;state.directories[key].push(v);save();render();toast('Добавлено')}
-window.removeDirectory=function(key,i){state.directories[key].splice(i,1);save();render()}
-
-const schemas={
- tasks:[['title','Название','text'],['project','Проект','text'],['owner','Ответственный','text'],['status','Статус','select','taskStatuses'],['priority','Приоритет','select','priorities'],['deadline','Срок','date']],
- projects:[['name','Название проекта','text'],['owner','Владелец','text'],['status','Статус','select','projectStatuses'],['progress','Прогресс, %','number'],['priority','Приоритет','select','priorities'],['deadline','Срок','date']],
- meetings:[['title','Тема встречи','text'],['date','Дата','date'],['owner','Команда / владелец','text'],['status','Статус','text'],['result','Результат / решение','textarea']],
- kpi:[['name','Показатель','text'],['owner','Владелец','text'],['plan','План','number'],['fact','Факт','number'],['unit','Единица','text']],
- blockers:[['title','Блокер','textarea'],['owner','Ответственный','text'],['impact','Влияние','select','priorities'],['status','Статус','text'],['deadline','Срок','date']],
- decisions:[['title','Вопрос на решение','textarea'],['owner','Кто принимает решение','text'],['priority','Приоритет','select','priorities'],['status','Статус','text'],['deadline','Срок','date']],
- teams:[['name','Команда','text'],['lead','Руководитель / владелец','text'],['area','Зона ответственности','textarea']]
+  ['Коммерческий блок','A','Приоритеты, KPI, управленческие решения'],['Корпоративные продажи','R/C','Проекты, задачи, фактическое исполнение'],['Маркетинг','R/C','Инициативы, лиды, активности и KPI'],['IT / разработка','R','Архитектура, интеграции, развитие BCC'],['DATA / BI','C/R','Показатели, источники данных, витрины'],['1С / Финансы','C','Финансовые факты и управленческие показатели'],['Информационная безопасность','C/A','Доступы, требования ИБ, допуск в рабочий контур'],['Руководители направлений','R','Актуальность задач, статусов, сроков и решений']
+ ],
+ modules:[
+  ['Проекты','Портфель инициатив, владелец, сроки, готовность'],['Мои задачи','Исполнение, срок, приоритет, просрочка'],['Встречи','Адженда, решения, обязательства, контроль следующей встречи'],['KPI','План, факт, прогноз и отклонения'],['Блокеры','Проблемы, критичность, владелец, срок снятия'],['Решения','Вопросы, которые требуют решения руководителя'],['Команды и RACI','Ответственные и зоны ответственности'],['Отчеты','Недельная сводка: сделано, план, риски, решения'],['Справочники','Управление статусами, ролями, приоритетами и командами'],['Права доступа','Ролевой доступ и разделение видимости данных'],['Облачная синхронизация','Единое состояние между устройствами и пользователями']
+ ],
+ dod:[
+  ['Структура BCC утверждена','Согласованы основные разделы и логика навигации'],['Роли и права доступа определены','Понятно, кто что видит и кто что изменяет'],['Проекты и задачи работают','Можно создать, назначить, изменить статус и срок'],['Встречи связаны с обязательствами','Решения и обещания не теряются после встречи'],['KPI имеют план и факт','Показатели доступны для регулярного контроля'],['Блокеры и эскалации работают','Есть владелец, критичность, срок и статус'],['Справочники редактируются','Статусы и варианты не зашиты навечно в код'],['Облачная синхронизация проверена','Изменения видны с другого устройства'],['Пилот проведен минимум на 2 командах','Собрана обратная связь реальных пользователей'],['ИБ дала допуск в рабочий контур','Нет критических замечаний по хранению и доступам'],['Еженедельный отчет формируется из BCC','Не требуется отдельный ручной реестр'],['Приемка завершена','Коммерческий директор и владельцы процессов приняли систему']
+ ]
 };
-window.openEntityModal=function(type){if(!schemas[type]){type='tasks'};const f=document.getElementById('entityForm');document.getElementById('modalTitle').textContent='Добавить: '+(titles[type]?.[0]||type);f.dataset.type=type;f.innerHTML=schemas[type].map(([key,label,kind,dir])=>fieldHtml(key,label,kind,dir)).join('')+`<div class="form-actions"><button type="button" class="btn secondary" onclick="closeModal()">Отмена</button><button type="submit" class="btn primary">Сохранить</button></div>`;f.onsubmit=submitEntity;document.getElementById('modalBackdrop').classList.remove('hidden')}
-function fieldHtml(key,label,kind,dir){const full=kind==='textarea'?' full':'';if(kind==='select'){return `<div class="field${full}"><label>${label}</label><select name="${key}" required>${state.directories[dir].map(x=>`<option>${esc(x)}</option>`).join('')}</select></div>`}if(kind==='textarea')return `<div class="field full"><label>${label}</label><textarea name="${key}" required></textarea></div>`;return `<div class="field${full}"><label>${label}</label><input name="${key}" type="${kind}" ${kind==='number'?'min="0"':''} required></div>`}
-function submitEntity(e){e.preventDefault();const type=e.target.dataset.type;const obj={id:id()};new FormData(e.target).forEach((v,k)=>obj[k]=v);['progress','plan','fact'].forEach(k=>{if(k in obj)obj[k]=Number(obj[k])});state[type].push(obj);save();closeModal();go(type);toast('Сохранено')}
-window.closeModal=closeModal;function closeModal(){document.getElementById('modalBackdrop').classList.add('hidden')}
-function toast(t){const x=document.getElementById('toast');x.textContent=t;x.classList.remove('hidden');setTimeout(()=>x.classList.add('hidden'),1800)}
-function exportData(){const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='atom-bcc-export.json';a.click();URL.revokeObjectURL(a.href)}
-function importData(e){const file=e.target.files[0];if(!file)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);Object.keys(state).forEach(k=>delete state[k]);Object.assign(state,d);save();render();toast('Импорт завершен')}catch(err){toast('Ошибка файла')}};r.readAsText(file);e.target.value=''}
 
-render();
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+const load=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key)||JSON.stringify(fallback))}catch{return fallback}};
+const save=(key,v)=>localStorage.setItem(key,JSON.stringify(v));
+const started=()=>Boolean(localStorage.getItem(START_KEY));
+const stageStatuses=()=>load(STAGES_KEY,{});
+const moduleStatuses=()=>load(MODULES_KEY,{});
+const teamOwners=()=>load(TEAMS_KEY,{});
+const blockers=()=>load(BLOCKERS_KEY,[]);
+const dodState=()=>load(DOD_KEY,{});
+const activeBlockers=()=>blockers().filter(x=>!['Решен','Закрыт'].includes(x.status));
+const criticalBlockers=()=>activeBlockers().filter(x=>x.severity==='Критическая').length;
+const stageStatus=id=>stageStatuses()[id]||'Не начато';
+const moduleStatus=i=>moduleStatuses()[i]||'Не начато';
+const stageProgress=id=>started()?(PROGRESS[stageStatus(id)]||0):0;
+const projectProgress=()=>started()?Math.round(DATA.stages.reduce((s,r)=>s+stageProgress(r[0]),0)/DATA.stages.length):0;
+const moduleReady=()=>DATA.modules.filter((_,i)=>moduleStatus(i)==='Готово').length;
+const ownerReady=()=>DATA.teams.filter((_,i)=>Boolean(teamOwners()[i])).length;
+const fmtDate=ts=>new Intl.DateTimeFormat('ru-RU',{day:'2-digit',month:'2-digit',year:'2-digit'}).format(new Date(ts));
+const fmtStart=ts=>new Intl.DateTimeFormat('ru-RU',{dateStyle:'medium',timeStyle:'medium'}).format(new Date(Number(ts)));
+const addDays=(ts,d)=>Number(ts)+d*86400000;
+const progress=p=>`<div class="progress"><div style="width:${Math.max(0,Math.min(100,p))}%"></div></div>`;
+const options=(arr,current)=>arr.map(x=>`<option ${x===current?'selected':''}>${esc(x)}</option>`).join('');
+
+function updateHeader(){const p=projectProgress();document.getElementById('header-progress').textContent=p+'%';document.getElementById('header-progress-bar').style.width=p+'%';}
+function render(view=currentView){currentView=view;document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('active',b.dataset.view===view));const views={overview,gantt,roadmap,teams,modules,issues,dod,architecture};app.innerHTML=views[view]();bind();updateHeader();updateClock();}
+
+document.querySelectorAll('.nav').forEach(btn=>btn.addEventListener('click',()=>render(btn.dataset.view)));
+
+function overview(){const ts=localStorage.getItem(START_KEY);return `<div class="project-start-card"><div><div class="label">Статус проекта</div><div class="project-state">${started()?'Проект запущен':'Не начат'}</div><div id="project-start-at" class="start-meta">${ts?'Старт: '+fmtStart(ts):'Проект еще не начат'}</div></div><div><div class="label">Время в проекте</div><div id="project-timer" class="project-timer">00 дн. 00:00:00</div></div><button id="start-project-btn" class="btn primary" ${started()?'disabled':''}>${started()?'Проект запущен':'Старт проекта'}</button></div>
+<div class="grid"><div class="card kpi"><div class="label">Готовность внедрения</div><div class="value">${projectProgress()}%</div>${progress(projectProgress())}<div class="sub">по статусам 12 этапов</div></div><div class="card kpi"><div class="label">Модули готовы</div><div class="value">${moduleReady()} / ${DATA.modules.length}</div><div class="sub">статус «Готово»</div></div><div class="card kpi"><div class="label">Владельцы назначены</div><div class="value">${ownerReady()} / ${DATA.teams.length}</div><div class="sub">команды и RACI</div></div><div class="card kpi"><div class="label">Критические блокеры</div><div class="value">${criticalBlockers()}</div><div class="sub">активные критические</div></div></div>
+<div class="section-title"><h2>Цель внедрения</h2></div><div class="callout"><b>${DATA.goal}</b><br><br>Это система управления внедрением и дальнейшей операционной работой BCC, а не BI-дашборд.</div>
+<div class="section-title"><h2>Контроль готовности</h2><small>Что требует внимания сейчас</small></div><div class="grid"><div class="card"><b>Этапы завершены</b><div style="font-size:28px;font-weight:700;margin-top:8px">${DATA.stages.filter(r=>stageStatus(r[0])==='Завершено').length} / ${DATA.stages.length}</div></div><div class="card"><b>Активные блокеры</b><div style="font-size:28px;font-weight:700;margin-top:8px">${activeBlockers().length}</div></div><div class="card"><b>DoD выполнено</b><div style="font-size:28px;font-weight:700;margin-top:8px">${DATA.dod.filter((_,i)=>dodState()[i]).length} / ${DATA.dod.length}</div></div><div class="card"><b>Следующий принцип</b><div style="margin-top:8px">Сначала управляем внедрением BCC, затем BCC становится рабочим центром управления бизнесом.</div></div></div>`;}
+
+function gantt(){const ps=started()?Number(localStorage.getItem(START_KEY)):Date.now();const tasks=[['Цели и владелец',0,7],['Роли и RACI',0,14],['Справочники',7,21],['Проекты',14,28],['Задачи и сроки',21,35],['Встречи и решения',28,42],['KPI',35,49],['Блокеры и отчеты',42,56],['Права и синхронизация',49,63],['Пилот команд',56,77],['ИБ и доработки',70,84],['Приемка',84,90]];return `<div class="section-title"><h2>Диаграмма Ганта</h2><small>План внедрения на 90 дней</small></div><div class="callout"><b>${started()?'Сроки рассчитаны от фактического старта проекта.':'Проект еще не запущен. Пока показан план от сегодняшней даты.'}</b></div><div class="gantt-wrap"><div class="gantt-head"><div class="gantt-task-head">Этап</div><div class="gantt-weeks">${Array.from({length:12},(_,i)=>`<div class="gantt-week">Н${i+1}</div>`).join('')}</div></div>${tasks.map(([n,s,e])=>`<div class="gantt-row"><div class="gantt-task"><b>${n}</b><small>${fmtDate(addDays(ps,s))} - ${fmtDate(addDays(ps,e))}</small></div><div class="gantt-track"><div class="gantt-grid"></div><div class="gantt-bar" style="left:${s/90*100}%;width:${Math.max(2,(e-s)/90*100)}%"></div></div></div>`).join('')}</div><div class="gantt-footer"><span>Старт: <b>${fmtDate(ps)}</b></span><span>Плановое завершение: <b>${fmtDate(addDays(ps,90))}</b></span><span>Срок: <b>90 дней</b></span></div>`;}
+
+function roadmap(){return `<div class="section-title"><h2>Этапы внедрения</h2><small>Статусы формируют общую готовность</small></div><table class="table"><thead><tr><th>#</th><th>Этап</th><th>Статус</th><th>Готовность</th></tr></thead><tbody>${DATA.stages.map(r=>`<tr><td>${r[0]}</td><td><b>${r[1]}</b></td><td><select class="stage-status" data-id="${r[0]}">${options(STAGE_STATUSES,stageStatus(r[0]))}</select></td><td>${stageProgress(r[0])}% ${progress(stageProgress(r[0]))}</td></tr>`).join('')}</tbody></table>`;}
+
+function teams(){const owners=teamOwners();return `<div class="section-title"><h2>Команды и RACI</h2><small>R делает · A отвечает · C консультирует</small></div><table class="table"><thead><tr><th>Команда</th><th>RACI</th><th>Роль</th><th>Ответственный</th></tr></thead><tbody>${DATA.teams.map((r,i)=>`<tr><td><b>${r[0]}</b></td><td>${r[1]}</td><td>${r[2]}</td><td><input class="team-owner" data-id="${i}" value="${esc(owners[i]||'')}" placeholder="ФИО / роль"></td></tr>`).join('')}</tbody></table>`;}
+
+function modules(){return `<div class="section-title"><h2>Модули ATOM BCC</h2><small>Что должно войти в рабочую систему</small></div><table class="table"><thead><tr><th>Модуль</th><th>Назначение</th><th>Статус внедрения</th></tr></thead><tbody>${DATA.modules.map((r,i)=>`<tr><td><b>${r[0]}</b></td><td>${r[1]}</td><td><select class="module-status" data-id="${i}">${options(MODULE_STATUSES,moduleStatus(i))}</select></td></tr>`).join('')}</tbody></table>`;}
+
+function issues(){const list=blockers();return `<div class="section-title"><h2>Блокеры внедрения</h2><small>активных: ${activeBlockers().length}, критических: ${criticalBlockers()}</small></div><div class="card"><h3 style="margin-top:0">Добавить блокер</h3><div style="display:grid;grid-template-columns:1.1fr 2fr 1fr 1fr;gap:10px"><input id="bl-area" placeholder="Этап / модуль"><input id="bl-desc" placeholder="Описание проблемы"><select id="bl-sev">${options(SEVERITY,'Средняя')}</select><input id="bl-owner" placeholder="Ответственный"></div><div style="display:flex;gap:10px;margin-top:10px"><input id="bl-due" type="date"><button id="add-blocker" class="btn primary">Создать блокер</button></div></div>${list.length?`<table class="table" style="margin-top:14px"><thead><tr><th>Область</th><th>Проблема</th><th>Критичность</th><th>Ответственный</th><th>Срок</th><th>Статус</th><th></th></tr></thead><tbody>${list.map(b=>`<tr><td>${esc(b.area)}</td><td>${esc(b.desc)}</td><td><select class="bl-severity" data-id="${b.id}">${options(SEVERITY,b.severity)}</select></td><td>${esc(b.owner)}</td><td>${esc(b.due||'')}</td><td><select class="bl-status" data-id="${b.id}">${options(BLOCKER_STATUSES,b.status)}</select></td><td><button class="btn del-blocker" data-id="${b.id}">Удалить</button></td></tr>`).join('')}</tbody></table>`:'<div class="callout">Блокеров пока нет.</div>'}`;}
+
+function dod(){const ds=dodState();return `<div class="section-title"><h2>Definition of Done</h2><small>Когда внедрение можно считать завершенным</small></div><div class="checklist">${DATA.dod.map((r,i)=>`<label class="check"><input type="checkbox" class="dod-check" data-id="${i}" ${ds[i]?'checked':''}><span><b>${r[0]}</b><small>${r[1]}</small></span></label>`).join('')}</div>`;}
+
+function architecture(){return `<div class="section-title"><h2>Архитектура ATOM BCC</h2><small>Логика продукта</small></div><div class="callout"><b>BCC не заменяет ELMA, 1С, BI или Jira-подобные системы.</b> Он собирает управленческий слой: кто что делает, что не сделано, где блокер, какое решение нужно и что происходит с ключевыми инициативами.</div><div class="architecture"><div class="arch-row"><div class="arch-node"><b>Команды АТОМ</b><br><small>бизнес · продажи · IT · DATA · ИБ</small></div><div class="arch-arrow">→</div><div class="arch-node"><b>ATOM BCC</b><br><small>единый центр управления</small></div></div><div class="arch-row"><div class="arch-node">Проекты</div><div class="arch-node">Задачи</div><div class="arch-node">Встречи</div><div class="arch-node">Решения</div><div class="arch-node">KPI</div><div class="arch-node">Блокеры</div></div><div class="arch-row"><div class="arch-node"><b>Источники факта</b><br><small>ELMA · Альфа-Авто · 1С · DWH · BI</small></div><div class="arch-arrow">→</div><div class="arch-node"><b>Управленческий отчет</b><br><small>что сделано · риски · решения · план</small></div><div class="arch-arrow">→</div><div class="arch-node"><b>Коммерческий директор</b></div></div></div>`;}
+
+function bind(){const start=document.getElementById('start-project-btn');if(start&&!started())start.onclick=()=>{localStorage.setItem(START_KEY,String(Date.now()));render('overview')};document.querySelectorAll('.stage-status').forEach(el=>el.onchange=()=>{const x=stageStatuses();x[el.dataset.id]=el.value;save(STAGES_KEY,x);render('roadmap')});document.querySelectorAll('.module-status').forEach(el=>el.onchange=()=>{const x=moduleStatuses();x[el.dataset.id]=el.value;save(MODULES_KEY,x);render('modules')});document.querySelectorAll('.team-owner').forEach(el=>el.onchange=()=>{const x=teamOwners();x[el.dataset.id]=el.value.trim();save(TEAMS_KEY,x);updateHeader()});document.querySelectorAll('.dod-check').forEach(el=>el.onchange=()=>{const x=dodState();x[el.dataset.id]=el.checked;save(DOD_KEY,x)});const add=document.getElementById('add-blocker');if(add)add.onclick=()=>{const area=document.getElementById('bl-area').value.trim(),desc=document.getElementById('bl-desc').value.trim();if(!area||!desc)return alert('Укажите область и описание блокера');const x=blockers();x.push({id:Date.now().toString(36),area,desc,severity:document.getElementById('bl-sev').value,owner:document.getElementById('bl-owner').value.trim(),due:document.getElementById('bl-due').value,status:'Открыт'});save(BLOCKERS_KEY,x);render('issues')};document.querySelectorAll('.bl-status').forEach(el=>el.onchange=()=>updateBlocker(el.dataset.id,'status',el.value));document.querySelectorAll('.bl-severity').forEach(el=>el.onchange=()=>updateBlocker(el.dataset.id,'severity',el.value));document.querySelectorAll('.del-blocker').forEach(el=>el.onclick=()=>{save(BLOCKERS_KEY,blockers().filter(x=>x.id!==el.dataset.id));render('issues')});}
+function updateBlocker(id,key,val){const x=blockers();const b=x.find(i=>i.id===id);if(b)b[key]=val;save(BLOCKERS_KEY,x);render('issues')}
+function updateClock(){clearInterval(timerHandle);const tick=()=>{const el=document.getElementById('project-timer'),ts=localStorage.getItem(START_KEY);if(!el)return;if(!ts){el.textContent='00 дн. 00:00:00';return}const s=Math.max(0,Math.floor((Date.now()-Number(ts))/1000)),d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60),ss=s%60,p=n=>String(n).padStart(2,'0');el.textContent=`${d} дн. ${p(h)}:${p(m)}:${p(ss)}`};tick();timerHandle=setInterval(tick,1000)}
+window.addEventListener('atom-sync-ready',()=>render(currentView));window.addEventListener('atom-sync-update',()=>render(currentView));
+render('overview');
