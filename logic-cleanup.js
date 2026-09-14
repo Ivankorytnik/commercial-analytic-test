@@ -1,5 +1,5 @@
 (function(){
-  const VERSION='1.1.0';
+  const VERSION='1.2.0';
   const BLOCKERS_KEY='atom-blockers';
   const NOT_ACTUAL='__not_actual__';
   let installed=false;
@@ -16,6 +16,7 @@
     return Boolean(c?.isRequirementNotActual?.(id))||localStorage.getItem(`atom-requirement-not-actual-${id}`)==='1'||state?.statusId===NOT_ACTUAL||state?.statusId==='not_actual';
   };
   const isActiveTeam=team=>activity()?.isActive?activity().isActive(team):true;
+  const hasManualStatus=b=>Boolean(b?.statusManual);
 
   function allRequirements(){
     const c=core();if(!c)return[];
@@ -57,7 +58,7 @@
 
       blockers.forEach(b=>{
         const key=String(b.autoKey||'');
-        if(!key.startsWith('CORE:RACI:')||known.has(key))return;
+        if(!key.startsWith('CORE:RACI:')||known.has(key)||hasManualStatus(b))return;
         if(!['Решен','Закрыт'].includes(b.status)){
           b.status='Решен';
           const note='Закрыт автоматически: связанное требование больше не существует.';
@@ -83,15 +84,15 @@
             id:Date.now()+Math.floor(Math.random()*100000),autoKey:key,source:`RACI: ${req.team}`,
             description,severity:'Высокая',owner,due,status:'Открыт',
             comment:`Этап Ганта: ${period?.stageId||req.stageId}. ${period?.stageName||c.stageName(req.stageId)}`,
-            createdAt:new Date().toISOString()
+            createdAt:new Date().toISOString(),statusManual:false
           });
           changed=true;
         }else if(problem&&existing){
           if(existing.description!==description){existing.description=description;changed=true;}
           if(existing.owner!==owner){existing.owner=owner;changed=true;}
           if(existing.due!==due){existing.due=due;changed=true;}
-          if(['Решен','Закрыт'].includes(existing.status)){existing.status='Открыт';changed=true;}
-        }else if(existing&&!['Решен','Закрыт'].includes(existing.status)){
+          if(!hasManualStatus(existing)&&['Решен','Закрыт'].includes(existing.status)){existing.status='Открыт';changed=true;}
+        }else if(existing&&!hasManualStatus(existing)&&!['Решен','Закрыт'].includes(existing.status)){
           existing.status='Решен';
           const note=excluded
             ? (isNotActual(req.id)?'Исключено из расчета: требование имеет статус «Не актуально».':'Исключено из расчета: команда не активна.')
@@ -105,6 +106,19 @@
     }finally{reconciling=false;}
     if(changed)window.dispatchEvent(new CustomEvent('atom-project-reconciled'));
     return changed;
+  }
+
+  function markBlockerStatusManual(select){
+    const id=select?.dataset?.id;
+    if(!id)return;
+    const blockers=read(BLOCKERS_KEY,[]);
+    const blocker=blockers.find(x=>String(x.id)===String(id));
+    if(!blocker)return;
+    blocker.status=select.value;
+    blocker.statusManual=true;
+    blocker.statusManualAt=new Date().toISOString();
+    write(BLOCKERS_KEY,blockers);
+    window.dispatchEvent(new CustomEvent('atom-blocker-status-manual',{detail:{id:blocker.id,status:blocker.status}}));
   }
 
   function patchOverview(){
@@ -173,6 +187,11 @@
   }
 
   document.addEventListener('change',e=>{
+    const blockerStatus=e.target.closest('.blocker-status');
+    if(blockerStatus){
+      markBlockerStatusManual(blockerStatus);
+      return;
+    }
     if(e.target.closest('[data-team-active]'))e.stopPropagation();
     const select=e.target.closest('[data-req-enh-status], .core-raci-table select[data-core-field="statusId"], select[data-pa-req-status]');
     if(!select)return;
