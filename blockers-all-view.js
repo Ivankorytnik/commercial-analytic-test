@@ -1,7 +1,7 @@
 (function(){
-  const VERSION='1.0.0';
+  const VERSION='1.1.0';
   let queued=false;
-  let filter='all';
+  let filter='active';
 
   const readBlockers=()=>{try{return JSON.parse(localStorage.getItem('atom-blockers')||'[]')||[]}catch{return[]}};
 
@@ -34,7 +34,7 @@
     const severity=row.querySelector('.blocker-severity')?.value||'';
     const status=row.querySelector('.blocker-status')?.value||'';
     if(filter==='active')return !['Решен','Закрыт'].includes(status);
-    if(filter==='critical')return severity==='Критическая';
+    if(filter==='critical')return severity==='Критическая'&&!['Решен','Закрыт'].includes(status);
     if(filter==='solved')return ['Решен','Закрыт'].includes(status);
     return true;
   }
@@ -57,13 +57,13 @@
     if(!title)return;
     const rows=readBlockers(),c=counters(rows);
     const h2=title.querySelector('h2');if(h2)h2.textContent='Блокеры';
-    const small=title.querySelector('small');if(small)small.textContent=`всего: ${c.total}, активных: ${c.active}, критических активных: ${c.critical}, решенных: ${c.solved}`;
+    const small=title.querySelector('small');if(small)small.textContent=`активных: ${c.active}, критических активных: ${c.critical}, решенных в истории: ${c.solved}`;
 
     let bar=document.querySelector('.blockers-filterbar');
     const table=[...document.querySelectorAll('#app table.table')].find(t=>t.querySelector('.blocker-status'));
     if(table&&!bar){
       bar=document.createElement('div');bar.className='blockers-filterbar';
-      bar.innerHTML=`<button type="button" class="btn active" data-blocker-filter="all">Все</button><button type="button" class="btn" data-blocker-filter="active">Активные</button><button type="button" class="btn" data-blocker-filter="critical">Критические</button><button type="button" class="btn" data-blocker-filter="solved">Решенные</button><span class="blockers-filter-count"></span>`;
+      bar.innerHTML=`<button type="button" class="btn" data-blocker-filter="all">Все</button><button type="button" class="btn active" data-blocker-filter="active">Активные</button><button type="button" class="btn" data-blocker-filter="critical">Критические</button><button type="button" class="btn" data-blocker-filter="solved">Решенные</button><span class="blockers-filter-count"></span>`;
       table.insertAdjacentElement('beforebegin',bar);
     }
     applyFilter();
@@ -71,7 +71,7 @@
 
   document.addEventListener('click',e=>{
     const btn=e.target.closest('[data-blocker-filter]');if(!btn)return;
-    filter=btn.dataset.blockerFilter||'all';applyFilter();
+    filter=btn.dataset.blockerFilter||'active';applyFilter();
   });
   document.addEventListener('change',e=>{
     if(e.target.closest('.blocker-status,.blocker-severity'))setTimeout(()=>{patch();applyFilter();},0);
@@ -79,7 +79,7 @@
 
   function queue(){if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;patch();});}
   new MutationObserver(queue).observe(document.body,{childList:true,subtree:true});
-  ['hashchange','atom-sync-update','atom-view-rendered','atom-project-reconciled','atom-blocker-status-manual'].forEach(ev=>window.addEventListener(ev,queue));
+  ['hashchange','atom-sync-update','atom-view-rendered','atom-project-reconciled','atom-blocker-status-manual','atom-core-data-changed'].forEach(ev=>window.addEventListener(ev,queue));
   window.ATOM_BLOCKERS_ALL_VIEW={version:VERSION,patch};
   setTimeout(queue,200);setTimeout(queue,700);
 })();
