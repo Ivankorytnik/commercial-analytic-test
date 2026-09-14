@@ -1,6 +1,7 @@
 (function(){
-  const VERSION='1.0.0';
+  const VERSION='1.1.0';
   const BLOCKERS_KEY='atom-blockers';
+  const NOT_ACTUAL='__not_actual__';
   let installed=false;
   let reconciling=false;
   let queued=false;
@@ -9,7 +10,11 @@
   const activity=()=>window.ATOM_TEAM_ACTIVITY;
   const read=(k,f)=>{try{const v=JSON.parse(localStorage.getItem(k)||'');return v??f}catch{return f}};
   const write=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
-  const isNotActual=id=>core()?.isRequirementNotActual?.(id)||localStorage.getItem(`atom-requirement-not-actual-${id}`)==='1';
+  const isNotActual=id=>{
+    const c=core();
+    const state=c?.getState?.(id);
+    return Boolean(c?.isRequirementNotActual?.(id))||localStorage.getItem(`atom-requirement-not-actual-${id}`)==='1'||state?.statusId===NOT_ACTUAL||state?.statusId==='not_actual';
+  };
   const isActiveTeam=team=>activity()?.isActive?activity().isActive(team):true;
 
   function allRequirements(){
@@ -17,6 +22,21 @@
     const out=[];
     (c.teams?.()||[]).forEach(team=>(c.requirementsByTeam?.(team)||[]).forEach(r=>out.push(r)));
     return out;
+  }
+
+  function ensureNotActualOptions(){
+    if(!location.hash.startsWith('#management/requirements')&&!location.hash.startsWith('#teams/'))return;
+    document.querySelectorAll('[data-req-enh-status], .core-raci-table select[data-core-field="statusId"], select[data-pa-req-status]').forEach(select=>{
+      const row=select.closest('[data-req-enh-row],[data-core-id]');
+      const id=row?.dataset.reqEnhRow||row?.dataset.coreId||'';
+      if(![...select.options].some(o=>o.value===NOT_ACTUAL)){
+        const option=document.createElement('option');
+        option.value=NOT_ACTUAL;
+        option.textContent='Не актуально';
+        select.appendChild(option);
+      }
+      if(id&&isNotActual(id))select.value=NOT_ACTUAL;
+    });
   }
 
   function canonicalReconcile(){
@@ -126,7 +146,7 @@
     });
     const done=countedRows.filter(row=>c.getState(row.dataset.reqEnhRow).statusId==='done').length;
     const na=visible.filter(row=>isNotActual(row.dataset.reqEnhRow)).length;
-    summary.textContent=`Показано ${shown} · учитывается ${countedRows.length} · готово ${done}/${countedRows.length} · не актуально ${na}`;
+    summary.textContent=`Показано ${shown} · учитывается ${countedRows.length} · готово ${done}/${countedRows.length} · не актуально ${na} (не считается)`;
   }
 
   function styles(){
@@ -146,20 +166,28 @@
 
   function patch(){
     if(!install())return;
+    ensureNotActualOptions();
     canonicalReconcile();
     patchOverview();
     patchRequirementSummary();
   }
 
-  // team-activity-ui already handles the checkbox in capture phase; prevent the older
-  // bubbling handler in team-activity.js from executing the same mutation a second time.
   document.addEventListener('change',e=>{
     if(e.target.closest('[data-team-active]'))e.stopPropagation();
+    const select=e.target.closest('[data-req-enh-status], .core-raci-table select[data-core-field="statusId"], select[data-pa-req-status]');
+    if(!select)return;
+    const row=select.closest('[data-req-enh-row],[data-core-id]');
+    const id=row?.dataset.reqEnhRow||row?.dataset.coreId;
+    if(!id)return;
+    if(select.value===NOT_ACTUAL){
+      window.ATOM_REQUIREMENTS_ENHANCED?.setNotActual?.(id,true);
+      setTimeout(()=>{canonicalReconcile();patchRequirementSummary();},0);
+    }
   },true);
 
   function queue(){if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;patch();});}
   new MutationObserver(queue).observe(document.body,{childList:true,subtree:true});
   ['hashchange','atom-core-ready','atom-sync-update','atom-view-rendered','atom-core-data-changed','atom-team-activity-changed','atom-reference-data-changed'].forEach(ev=>window.addEventListener(ev,queue));
-  window.ATOM_LOGIC_CLEANUP={version:VERSION,reconcile:canonicalReconcile,patch};
-  styles();setTimeout(queue,1000);setTimeout(queue,2200);
+  window.ATOM_LOGIC_CLEANUP={version:VERSION,reconcile:canonicalReconcile,patch,isNotActual};
+  styles();setTimeout(queue,500);setTimeout(queue,1400);
 })();
