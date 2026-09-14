@@ -1,13 +1,13 @@
 (function(){
-  const VERSION='1.2.0';
+  const VERSION='1.3.0';
   const REF_KEY='atom-reference-data-v1';
   const NOT_ACTUAL='__not_actual__';
-  const INACTIVE='__inactive__';
+  const QUEUE='__inactive__';
   const REL_PREFIX='atom-requirement-not-actual-';
   const EXCLUDED_LABEL_PREFIX='atom-requirement-excluded-label-';
   const CUSTOM_STATUS_PREFIX='atom-requirement-custom-status-';
   const MANUAL_PREFIX='atom-requirement-status-manual-';
-  const DEFAULTS=['Не запрошено','Запрос подготовлен','Запрос отправлен','В работе','Ответ получен','Требует уточнения','Блокер','Готово','Не актуально'];
+  const DEFAULTS=['Не запрошено','Запрос подготовлен','Запрос отправлен','В работе','Ответ получен','Требует уточнения','Блокер','Готово','Не актуально','В очереди'];
   let queued=false;
   let corePatched=false;
   let originalGetState=null;
@@ -23,14 +23,27 @@
     window.dispatchEvent(new CustomEvent('atom-core-data-changed',{detail:{type:'requirement-status-directory'}}));
   };
 
+  function migrateLegacyQueueLabels(){
+    let changed=false;
+    for(let i=0;i<localStorage.length;i++){
+      const key=localStorage.key(i);
+      if(!key?.startsWith(EXCLUDED_LABEL_PREFIX))continue;
+      if(norm(localStorage.getItem(key))==='не активно'){
+        localStorage.setItem(key,'В очереди');
+        changed=true;
+      }
+    }
+    return changed;
+  }
+
   function ensureRefs(){
     const refs=readRefs();
     let changed=false;
     if(!Array.isArray(refs.requirement)||!refs.requirement.length){refs.requirement=DEFAULTS.slice();changed=true;}
+    refs.requirement=(refs.requirement||[]).map(x=>norm(x)==='не активно'?'В очереди':x);
+    refs.requirement=refs.requirement.filter((x,i,a)=>a.findIndex(y=>norm(y)===norm(x))===i);
     DEFAULTS.forEach(v=>{if(!refs.requirement.some(x=>norm(x)===norm(v))){refs.requirement.push(v);changed=true;}});
-    if(Array.isArray(refs.stage)&&refs.stage.some(x=>norm(x)==='не активно')&&!refs.requirement.some(x=>norm(x)==='не активно')){
-      refs.requirement.push('Не активно');changed=true;
-    }
+    if(migrateLegacyQueueLabels())changed=true;
     if(changed)writeRefs(refs);
     return refs;
   }
@@ -45,7 +58,7 @@
   function valueForLabel(label){
     const n=norm(label);
     if(n==='не актуально')return NOT_ACTUAL;
-    if(n==='не активно')return INACTIVE;
+    if(n==='в очереди'||n==='не активно')return QUEUE;
     const known=knownByLabel().get(n);
     return known||`custom:${encodeURIComponent(String(label))}`;
   }
@@ -80,7 +93,8 @@
     const manual=manualFor(id);
     if(manual?.value)return manual.value;
     if(localStorage.getItem(`${REL_PREFIX}${id}`)==='1'){
-      return norm(localStorage.getItem(`${EXCLUDED_LABEL_PREFIX}${id}`))==='не активно'?INACTIVE:NOT_ACTUAL;
+      const label=norm(localStorage.getItem(`${EXCLUDED_LABEL_PREFIX}${id}`));
+      return (label==='в очереди'||label==='не активно')?QUEUE:NOT_ACTUAL;
     }
     const custom=localStorage.getItem(`${CUSTOM_STATUS_PREFIX}${id}`);
     if(custom)return valueForLabel(custom);
@@ -126,9 +140,9 @@
     const label=select.options[select.selectedIndex]?.textContent?.trim()||'';
     saveManual(id,value,label);
 
-    if(value===NOT_ACTUAL||value===INACTIVE){
+    if(value===NOT_ACTUAL||value===QUEUE){
       localStorage.setItem(`${REL_PREFIX}${id}`,'1');
-      localStorage.setItem(`${EXCLUDED_LABEL_PREFIX}${id}`,label||(value===INACTIVE?'Не активно':'Не актуально'));
+      localStorage.setItem(`${EXCLUDED_LABEL_PREFIX}${id}`,value===QUEUE?'В очереди':'Не актуально');
       localStorage.removeItem(`${CUSTOM_STATUS_PREFIX}${id}`);
       c.setState?.(id,{statusId:'not_requested'});
     }else if(String(value).startsWith('custom:')){
@@ -144,7 +158,7 @@
     }
 
     select.value=value;
-    window.dispatchEvent(new CustomEvent('atom-core-data-changed',{detail:{type:'requirement-status',id,status:value,label}}));
+    window.dispatchEvent(new CustomEvent('atom-core-data-changed',{detail:{type:'requirement-status',id,status:value,label:value===QUEUE?'В очереди':label}}));
     setTimeout(patchSelects,0);
   }
 
