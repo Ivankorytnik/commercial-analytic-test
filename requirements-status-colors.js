@@ -1,5 +1,5 @@
 (function(){
-  const VERSION='1.0.0';
+  const VERSION='1.1.0';
   const STATUS_CLASSES=['req-status-not-requested','req-status-prepared','req-status-sent','req-status-in-progress','req-status-answered','req-status-clarify','req-status-blocker','req-status-done','req-status-not-actual'];
   const MAP={
     not_requested:'req-status-not-requested',
@@ -10,7 +10,8 @@
     clarify:'req-status-clarify',
     blocker:'req-status-blocker',
     done:'req-status-done',
-    __not_actual__:'req-status-not-actual'
+    __not_actual__:'req-status-not-actual',
+    __inactive__:'req-status-not-actual'
   };
 
   function styles(){
@@ -32,17 +33,14 @@
       tr.req-row-status-done td:first-child{box-shadow:inset 4px 0 0 #3d9b62;}
       tr.req-row-status-clarify td:first-child{box-shadow:inset 4px 0 0 #d7a62d;}
       tr.req-row-status-in-progress td:first-child{box-shadow:inset 4px 0 0 #18a596;}
-      tr.req-row-status-not-actual td:first-child{box-shadow:inset 4px 0 0 #9ba7a8;}
+      tr.req-row-status-not-actual td:first-child,tr.req-row-status---inactive-- td:first-child{box-shadow:inset 4px 0 0 #9ba7a8;}
       .req-status-legend{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:2px;font-size:9px;color:var(--muted);}
       .req-status-legend span{display:inline-flex;align-items:center;gap:5px;padding:3px 7px;border-radius:999px;border:1px solid transparent;font-weight:700;}
-      .req-status-legend .req-status-not-requested,.req-status-legend .req-status-prepared,.req-status-legend .req-status-sent,.req-status-legend .req-status-in-progress,.req-status-legend .req-status-answered,.req-status-legend .req-status-clarify,.req-status-legend .req-status-blocker,.req-status-legend .req-status-done,.req-status-legend .req-status-not-actual{display:inline-flex;}
     `;
     document.head.appendChild(s);
   }
 
-  function clean(el){
-    STATUS_CLASSES.forEach(c=>el.classList.remove(c));
-  }
+  function clean(el){STATUS_CLASSES.forEach(c=>el.classList.remove(c));}
 
   function applySelect(select){
     if(!select)return;
@@ -50,11 +48,11 @@
     select.classList.add('req-status-select');
     const cls=MAP[select.value]||'req-status-not-requested';
     select.classList.add(cls);
-
     const row=select.closest('tr');
     if(row){
       [...row.classList].filter(c=>c.startsWith('req-row-status-')).forEach(c=>row.classList.remove(c));
-      row.classList.add(`req-row-status-${select.value==='__not_actual__'?'not-actual':select.value.replaceAll('_','-')}`);
+      const suffix=select.value==='__not_actual__'?'not-actual':select.value==='__inactive__'?'queue':select.value.replaceAll('_','-');
+      row.classList.add(`req-row-status-${suffix}`);
     }
   }
 
@@ -75,7 +73,8 @@
       <span class="req-status-clarify">Требует уточнения</span>
       <span class="req-status-blocker">Блокер</span>
       <span class="req-status-done">Готово</span>
-      <span class="req-status-not-actual">Не актуально</span>`;
+      <span class="req-status-not-actual">Не актуально</span>
+      <span class="req-status-not-actual">В очереди</span>`;
     toolbar.insertAdjacentElement('afterend',div);
   }
 
