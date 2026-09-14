@@ -1,5 +1,5 @@
 (function(){
-  const VERSION='1.2.0';
+  const VERSION='1.2.1';
   const META_PREFIX='atom-core-requirement-meta-';
   const BLOCKERS_KEY='atom-blockers';
   let patchedCore=false;
@@ -120,7 +120,9 @@
   }
 
   function patchCore(){
-    const c=core();if(patchedCore||!c)return false;
+    const c=core();
+    if(!c)return false;
+    if(patchedCore)return true;
     ['periodForRequirement','requirementOverdue','requirementProblem','teamSummary','linkedSummary','stageSummary','reconcile'].forEach(k=>original[k]=c[k]?.bind(c));
     if(!original.periodForRequirement||!original.reconcile)return false;
     c.periodForRequirement=function(reqOrId){const req=typeof reqOrId==='string'?c.requirement(reqOrId):reqOrId;return customPeriod(req)||original.periodForRequirement(reqOrId)};
@@ -285,10 +287,11 @@
     });
   }
 
-  // Important: no global MutationObserver here. It caused continuous DOM rewrites in the
-  // requirements table and closed native select dropdowns immediately after opening.
   ['hashchange','atom-core-ready','atom-sync-update','atom-view-rendered','atom-core-data-changed'].forEach(ev=>window.addEventListener(ev,patch));
   document.addEventListener('focusout',e=>{if(e.target?.matches?.(interactiveSelector))setTimeout(patch,80);},true);
   window.ATOM_REQUIREMENTS_TIME={version:VERSION,patch,saveTimes,resetTimes,customPeriod};
-  setTimeout(patch,500);setTimeout(patch,1200);
+  setTimeout(patch,300);
+  setTimeout(patch,800);
+  setTimeout(patch,1600);
+  setTimeout(patch,3000);
 })();
