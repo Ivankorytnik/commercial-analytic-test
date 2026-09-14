@@ -1,7 +1,6 @@
 (function(){
-  const VERSION='1.0.0';
+  const VERSION='1.1.0';
   const PREFIX='atom-requirement-period-override-';
-  const DAY=86400000;
   let installed=false;
   let base={};
   let modal=null;
@@ -10,6 +9,7 @@
   const key=id=>`${PREFIX}${id}`;
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
   const fmt=v=>{if(!v)return'Не задано';const p=String(v).split('-');return p.length===3?`${p[2]}.${p[1]}.${p[0]}`:String(v)};
+  const shortFmt=v=>{if(!v)return'';const p=String(v).split('-');return p.length===3?`${p[2]}.${p[1]}`:String(v)};
   const today=()=>{const d=new Date();d.setHours(0,0,0,0);return d.getTime();};
   const toTs=v=>{const n=new Date(`${v}T00:00:00`).getTime();return Number.isFinite(n)?n:0;};
 
@@ -40,7 +40,10 @@
     const s=document.createElement('style');
     s.id='requirements-period-editor-css';
     s.textContent=`
-      .req-period-edit{display:inline-flex;align-items:center;gap:4px;margin-top:5px;padding:4px 7px;border:1px solid #cbd9d9;border-radius:6px;background:#fff;color:#355253;font:inherit;font-size:9px;cursor:pointer}
+      .req-period-inline{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:7px;padding-top:6px;border-top:1px dashed #dbe5e5}
+      .req-period-inline-label{font-size:9px;color:#647879;white-space:nowrap}
+      .req-period-inline-label.manual{color:#0f6962;font-weight:700}
+      .req-period-edit{display:inline-flex;align-items:center;gap:4px;padding:4px 7px;border:1px solid #cbd9d9;border-radius:6px;background:#fff;color:#355253;font:inherit;font-size:9px;cursor:pointer;white-space:nowrap}
       .req-period-edit:hover{background:#eef9f7;border-color:#7fded4;color:#0f6962}
       .req-period-edit.manual{background:#e7faf6;border-color:#92dfd6;color:#0f6962;font-weight:700}
       .req-period-overlay{position:fixed;inset:0;z-index:2147483200;background:rgba(24,42,43,.38);display:flex;align-items:center;justify-content:center;padding:18px}
@@ -148,9 +151,18 @@
 
   function decorate(){
     if(!location.hash.startsWith('#management/requirements'))return;
+    const c=core();if(!c)return;
     document.querySelectorAll('[data-req-enh-row]').forEach(row=>{
-      const id=row.dataset.reqEnhRow,cell=row.querySelector('.req-enh-period');if(!id||!cell||cell.querySelector('.req-period-edit'))return;
-      const b=document.createElement('button');b.type='button';b.className=`req-period-edit${read(id)?' manual':''}`;b.dataset.reqPeriodEdit=id;b.textContent=read(id)?'Изменить период':'Корректировать';cell.appendChild(document.createElement('br'));cell.appendChild(b);
+      const id=row.dataset.reqEnhRow;if(!id)return;
+      const req=c.requirement?.(id);if(!req)return;
+      const p=c.periodForRequirement?.(req)||{};
+      const manual=Boolean(read(id)||p.customDates);
+      const whatCell=row.children?.[1];if(!whatCell)return;
+      let wrap=whatCell.querySelector('.req-period-inline');
+      if(!wrap){wrap=document.createElement('div');wrap.className='req-period-inline';whatCell.appendChild(wrap);}
+      wrap.innerHTML=`<span class="req-period-inline-label ${manual?'manual':''}">${manual?'Индивидуальный период':'Период'}: <b>${esc(shortFmt(p.startDate)||'—')} - ${esc(shortFmt(p.endDate)||'—')}</b></span><button type="button" class="req-period-edit ${manual?'manual':''}" data-req-period-edit="${esc(id)}">${manual?'Изменить период':'Корректировать период'}</button>`;
+      const periodCell=row.querySelector('.req-enh-period');
+      if(periodCell)periodCell.querySelectorAll('.req-period-edit').forEach(x=>x.remove());
     });
   }
 
@@ -162,20 +174,20 @@
     closeModal();
     const current=c.periodForRequirement?.(req)||{};
     const baseP=base.periodForRequirement?base.periodForRequirement(req):null;
-    const hasOverride=Boolean(read(id));
+    const hasOverride=Boolean(read(id)||current?.customDates);
     modal=document.createElement('div');
     modal.className='req-period-overlay';
     modal.innerHTML=`<div class="req-period-dialog" role="dialog" aria-modal="true">
       <h3>Корректировка периода</h3>
       <div class="req-period-sub"><b>${esc(req.team||'')}</b><br>${esc(req.text||'')}</div>
-      <div class="req-period-base">Срок по этапу / исходный срок: <b>${fmt(baseP?.startDate)} - ${fmt(baseP?.endDate)}</b><br>Этап: ${esc(req.stageId)}. ${esc(current?.stageName||c.stageName?.(req.stageId)||'')}</div>
+      <div class="req-period-base">Исходный срок / срок этапа: <b>${fmt(baseP?.startDate)} - ${fmt(baseP?.endDate)}</b><br>Этап: ${esc(req.stageId)}. ${esc(current?.stageName||c.stageName?.(req.stageId)||'')}</div>
       <div class="req-period-fields">
         <div class="req-period-field"><label>Дата начала</label><input type="date" data-req-period-start value="${esc(current?.startDate||baseP?.startDate||'')}"></div>
         <div class="req-period-field"><label>Дата окончания</label><input type="date" data-req-period-end value="${esc(current?.endDate||baseP?.endDate||'')}"></div>
       </div>
       <div class="req-period-error" data-req-period-error></div>
       <div class="req-period-actions">
-        <button type="button" class="btn" data-req-period-reset ${hasOverride||req.custom?'':'disabled'}>Вернуть срок этапа</button>
+        <button type="button" class="btn" data-req-period-reset ${hasOverride?'':'disabled'}>Вернуть срок этапа</button>
         <div class="req-period-actions-right"><button type="button" class="btn" data-req-period-cancel>Отмена</button><button type="button" class="btn primary" data-req-period-save>Сохранить</button></div>
       </div>
     </div>`;
@@ -195,7 +207,7 @@
 
   document.addEventListener('click',e=>{
     const edit=e.target.closest?.('[data-req-period-edit]');
-    if(edit){e.preventDefault();openModal(edit.dataset.reqPeriodEdit);return;}
+    if(edit){e.preventDefault();e.stopPropagation();openModal(edit.dataset.reqPeriodEdit);return;}
     if(e.target.closest?.('[data-req-period-cancel]')){e.preventDefault();closeModal();return;}
     if(e.target===modal){closeModal();return;}
     if(e.target.closest?.('[data-req-period-save]')){
