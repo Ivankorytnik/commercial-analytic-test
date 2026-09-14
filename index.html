@@ -16,8 +16,7 @@
     .header-status{flex-direction:row;align-items:center;justify-content:flex-end;gap:10px;min-width:0;flex-wrap:nowrap}
     .project-progress-box{width:220px;flex:0 0 220px;padding:10px 12px}
     .status-pill{white-space:nowrap;flex:0 0 auto}
-    body.logic-pending .content,body.logic-pending .project-progress-box{visibility:hidden}
-    body.logic-pending .content{min-height:320px}
+    body.logic-pending .project-progress-box{visibility:hidden}
     @media(max-width:1100px){.topbar{flex-direction:column}.header-status{width:100%;justify-content:flex-start;flex-wrap:wrap}.project-progress-box{width:220px}}
     @media(max-width:600px){.header-status{align-items:flex-start}.project-progress-box{width:100%;flex-basis:100%}}
   </style>
@@ -29,7 +28,7 @@
       <h1>Управление внедрением коммерческой аналитики АТОМ</h1>
       <p>Единый центр управления внедрением от источника лида до BI-дашборда</p>
       <div class="build-meta">
-        <span>Версия <b>v1.13.0 REQUIREMENTS MASTER</b></span>
+        <span>Версия <b>v1.13.1 FAST START</b></span>
         <span>Обновлено <b>14.09.2026</b></span>
       </div>
     </div>
@@ -103,7 +102,7 @@
           revealed=true;
           document.body.classList.remove('logic-pending');
         }
-      },7000);
+      },1800);
     })();
   </script>
   <script src="sync-status.js?v=1.2.1"></script>
@@ -165,7 +164,7 @@
         ].forEach(src=>{const s=document.createElement('script');s.src=src;s.async=false;document.body.appendChild(s);});
       }
       window.addEventListener('atom-sync-ready',loadApp,{once:true});
-      setTimeout(loadApp,4000);
+      setTimeout(loadApp,1500);
     })();
   </script>
 </body>
