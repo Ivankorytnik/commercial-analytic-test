@@ -1,5 +1,5 @@
 (function(){
-  const VERSION='1.0.0';
+  const VERSION='1.0.1';
   const META_PREFIX='atom-core-requirement-meta-';
   let queued=false;
 
@@ -65,6 +65,11 @@
 
   function patchRows(){
     if(!location.hash.startsWith('#management/requirements'))return;
+
+    // requirements-time.js is the single owner of period cells and edit controls.
+    // The legacy renderer below is used only if that module is not available.
+    if(window.ATOM_REQUIREMENTS_TIME?.patch)return;
+
     document.querySelectorAll('#pa-panel tr[data-pa-req]').forEach(row=>{
       const id=row.dataset.paReq,m=read(`${META_PREFIX}${id}`,null);if(!m?.customStartAt||!m?.customEndAt)return;
       const cell=row.children[2];if(!cell)return;
