@@ -1,6 +1,6 @@
 (function(){
-  const VERSION='1.0.0';
-  const FILTER_KEY='atom-requirements-team-filter';
+  const VERSION='1.1.0';
+  const FILTER_KEY='atom-requirements-team-filter-pending';
   const TARGET_HASH='#management/requirements';
   let applying=false;
 
@@ -8,35 +8,36 @@
     return card?.dataset?.coreTeam||card?.querySelector('.core-team-name')?.textContent?.trim()||'';
   }
 
-  function saveTeam(team){
+  function savePending(team){
     if(team)sessionStorage.setItem(FILTER_KEY,team);
   }
 
-  function savedTeam(){
+  function pendingTeam(){
     return sessionStorage.getItem(FILTER_KEY)||'';
+  }
+
+  function clearPending(){
+    sessionStorage.removeItem(FILTER_KEY);
   }
 
   function goToRequirements(team){
     if(!team)return;
-    saveTeam(team);
-    if(location.hash===TARGET_HASH){
-      applyFilter();
-    }else{
-      location.hash=TARGET_HASH;
-    }
+    savePending(team);
+    if(location.hash===TARGET_HASH)applyFilter();
+    else location.hash=TARGET_HASH;
   }
 
   function applyFilter(){
     if(applying||!location.hash.startsWith(TARGET_HASH))return;
-    const team=savedTeam();
+    const team=pendingTeam();
     if(!team)return;
     const select=document.getElementById('req-enh-team');
     if(!select)return;
     const option=[...select.options].find(o=>o.value===team);
-    if(!option)return;
-    if(select.value===team)return;
+    if(!option){clearPending();return;}
     applying=true;
     select.value=team;
+    clearPending();
     select.dispatchEvent(new Event('change',{bubbles:true}));
     setTimeout(()=>{applying=false;},0);
   }
@@ -52,14 +53,6 @@
     goToRequirements(team);
   },true);
 
-  document.addEventListener('change',e=>{
-    const select=e.target.closest('#req-enh-team');
-    if(!select)return;
-    const value=select.value||'';
-    if(value&&value!=='__all__')saveTeam(value);
-    else sessionStorage.removeItem(FILTER_KEY);
-  },true);
-
   let queued=false;
   function queue(){
     if(queued)return;
@@ -71,7 +64,7 @@
   }
 
   new MutationObserver(queue).observe(document.body,{childList:true,subtree:true});
-  ['hashchange','atom-view-rendered','atom-sync-update','atom-core-data-changed'].forEach(ev=>window.addEventListener(ev,queue));
+  ['hashchange','atom-view-rendered','atom-sync-update'].forEach(ev=>window.addEventListener(ev,queue));
 
   window.ATOM_OVERVIEW_TEAM_REQUIREMENTS_LINK={version:VERSION,goToRequirements,applyFilter};
   setTimeout(queue,300);
