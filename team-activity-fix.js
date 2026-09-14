@@ -1,7 +1,7 @@
 (function(){
-  const VERSION='1.2.0';
+  const VERSION='1.2.1';
   const DAY=86400000;
-  const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+  const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#039;'}[m]));
   const read=(k,f)=>{try{const v=JSON.parse(localStorage.getItem(k)||'');return v??f}catch{return f}};
   const write=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
   const core=()=>window.ATOM_CORE;
@@ -18,7 +18,7 @@
     const rows=read('atom-blockers',[]);
     let changed=false;
     rows.forEach(b=>{
-      if(!b||['Решен','Закрыт'].includes(b.status))return;
+      if(!b||b.statusManual||b.manualStatusValue||['Решен','Закрыт'].includes(b.status))return;
       let shouldClose=false,reason='';
       if(String(b.autoKey||'').startsWith('CORE:RACI:')){
         const id=String(b.autoKey).slice('CORE:RACI:'.length),req=c.requirement?.(id);
