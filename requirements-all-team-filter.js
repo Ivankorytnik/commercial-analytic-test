@@ -1,7 +1,8 @@
 (function(){
-  const VERSION='1.0.0';
+  const VERSION='1.1.0';
   const ALL='__all__';
   const SESSION_KEY='atom-pa-requirements-team-filter';
+  const PENDING_KEY='atom-requirements-team-filter-pending';
   let queued=false;
 
   const core=()=>window.ATOM_CORE;
@@ -53,6 +54,7 @@
     const c=core(),select=ensureAllOption(),panel=document.getElementById('pa-panel');
     if(!c||!select||!panel)return;
     select.value=ALL;
+    sessionStorage.setItem(SESSION_KEY,ALL);
     const rows=allRows();
     const toolbar=select.closest('.pa-toolbar');
     if(toolbar){
@@ -91,10 +93,31 @@
     document.getElementById('pa-all-add-hint')?.remove();
   }
 
+  function applyPendingTeam(select){
+    const c=core();
+    const pending=sessionStorage.getItem(PENDING_KEY)||'';
+    if(!pending||!c?.teams?.().includes(pending))return false;
+    sessionStorage.removeItem(PENDING_KEY);
+    sessionStorage.setItem(SESSION_KEY,pending);
+    if(select.value!==pending){
+      select.value=pending;
+      select.dispatchEvent(new Event('change',{bubbles:true}));
+    }
+    return true;
+  }
+
   function patch(){
     if(!location.hash.startsWith('#management/requirements'))return;
     const select=ensureAllOption();if(!select)return;
-    const saved=sessionStorage.getItem(SESSION_KEY);
+
+    // Explicit transition from an Overview team card has priority over the default.
+    if(applyPendingTeam(select))return;
+
+    let saved=sessionStorage.getItem(SESSION_KEY);
+    if(!saved){
+      saved=ALL;
+      sessionStorage.setItem(SESSION_KEY,ALL);
+    }
     if(saved===ALL){
       if(select.value!==ALL||document.getElementById('pa-panel')?.dataset.requirementsAllRendered!=='1')renderAll();
     }
@@ -121,5 +144,5 @@
   new MutationObserver(queue).observe(document.body,{childList:true,subtree:true});
   ['hashchange','atom-view-rendered','atom-sync-update','atom-core-data-changed'].forEach(ev=>window.addEventListener(ev,queue));
   window.ATOM_REQUIREMENTS_ALL_TEAM_FILTER={version:VERSION,renderAll,patch};
-  setTimeout(queue,250);setTimeout(queue,800);setTimeout(queue,1500);
+  setTimeout(queue,150);setTimeout(queue,500);setTimeout(queue,1200);
 })();
