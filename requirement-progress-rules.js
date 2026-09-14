@@ -1,5 +1,5 @@
 (function(){
-  const VERSION='1.0.0';
+  const VERSION='1.1.0';
   const NOT_ACTUAL='__not_actual__';
   const QUEUE='__inactive__';
   let installed=false;
@@ -10,6 +10,7 @@
   const norm=s=>String(s||'').trim().toLowerCase();
   const excludedLabel=id=>norm(localStorage.getItem(`atom-requirement-excluded-label-${id}`));
   const manualStatus=id=>{try{return JSON.parse(localStorage.getItem(`atom-requirement-status-manual-${id}`)||'null')}catch{return null}};
+  const isTeamActive=team=>activity()?.isActive?activity().isActive(team):true;
 
   function effectiveStatus(req){
     const c=core();
@@ -23,8 +24,7 @@
   }
 
   function isCounted(req){
-    if(!req)return false;
-    if(activity()?.isActive&&!activity().isActive(req.team))return false;
+    if(!req||!isTeamActive(req.team))return false;
     const status=effectiveStatus(req);
     return ![NOT_ACTUAL,QUEUE,'done'].includes(status);
   }
@@ -37,8 +37,10 @@
     if(original.requirementsByStage)return original.requirementsByStage(stageId)||[];
     return [];
   }
-  function countedByTeam(team){return rawByTeam(team).filter(isCounted);}
-  function countedByStage(stageId){return rawByStage(stageId).filter(isCounted);}
+  function activeRawByTeam(team){return isTeamActive(team)?rawByTeam(team):[];}
+  function activeRawByStage(stageId){return rawByStage(stageId).filter(r=>isTeamActive(r.team));}
+  function countedByTeam(team){return activeRawByTeam(team).filter(isCounted);}
+  function countedByStage(stageId){return activeRawByStage(stageId).filter(isCounted);}
 
   function requirementProgress(id){
     const c=core(),req=c?.requirement?.(id);
@@ -53,10 +55,21 @@
   }
 
   function teamSummary(team){
-    const c=core(),rows=countedByTeam(team),states=rows.map(r=>c.getState(r.id));
+    const c=core(),active=isTeamActive(team);
+    const all=rawByTeam(team);
+    if(!active){
+      return {
+        team,teamId:c.TEAM_IDS?.[team]||team,total:0,progress:0,done:0,work:0,problem:0,
+        owner:c.teamOwner(team),active:false,excluded:true,
+        excludedInactive:all.length,
+        excludedDone:all.filter(r=>effectiveStatus(r)==='done').length,
+        excludedQueue:all.filter(r=>effectiveStatus(r)===QUEUE).length,
+        excludedNotActual:all.filter(r=>effectiveStatus(r)===NOT_ACTUAL).length
+      };
+    }
+    const rows=countedByTeam(team),states=rows.map(r=>c.getState(r.id));
     const total=rows.length;
     const progress=total?Math.round(rows.reduce((n,r)=>n+requirementProgress(r.id),0)/total):0;
-    const all=rawByTeam(team);
     return {
       team,
       teamId:c.TEAM_IDS?.[team]||team,
@@ -66,8 +79,9 @@
       work:states.filter(x=>x.statusId!=='not_requested').length,
       problem:rows.filter(requirementProblem).length,
       owner:c.teamOwner(team),
-      active:activity()?.isActive?activity().isActive(team):true,
-      excluded:activity()?.isActive?!activity().isActive(team):false,
+      active:true,
+      excluded:false,
+      excludedInactive:0,
       excludedDone:all.filter(r=>effectiveStatus(r)==='done').length,
       excludedQueue:all.filter(r=>effectiveStatus(r)===QUEUE).length,
       excludedNotActual:all.filter(r=>effectiveStatus(r)===NOT_ACTUAL).length
@@ -116,8 +130,19 @@
   }
 
   function projectProgress(){
+    if((activity()?.activeCount?.()??1)===0)return 0;
     const stages=Array.from({length:12},(_,i)=>stageSummary(i+1)).filter(x=>x.relevant);
     return stages.length?Math.round(stages.reduce((n,x)=>n+x.progress,0)/stages.length):0;
+  }
+
+  function updateHeader(){
+    if(!installed)return;
+    const value=projectProgress();
+    const text=document.getElementById('header-progress');
+    const bar=document.getElementById('header-progress-bar');
+    if(text)text.textContent=`${value}%`;
+    if(bar)bar.style.width=`${value}%`;
+    window.dispatchEvent(new CustomEvent('atom-project-progress-changed',{detail:{progress:value,activeTeams:activity()?.activeCount?.()??null}}));
   }
 
   function install(){
@@ -138,11 +163,16 @@
     c.countedRequirementsByTeam=countedByTeam;
     c.countedRequirementsByStage=countedByStage;
     installed=true;
+    updateHeader();
     window.dispatchEvent(new CustomEvent('atom-project-progress-rules-ready',{detail:{version:VERSION}}));
   }
 
-  function refresh(){install();if(!installed)return;window.dispatchEvent(new CustomEvent('atom-view-rendered'));}
-  ['atom-core-ready','atom-core-data-changed','atom-team-activity-changed','atom-reference-data-changed','hashchange'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(install,0)));
-  window.ATOM_REQUIREMENT_PROGRESS_RULES={version:VERSION,install,isCounted,effectiveStatus,projectProgress};
-  setTimeout(install,900);setTimeout(install,1800);
+  function recalc(){
+    install();if(!installed)return;
+    updateHeader();
+  }
+
+  ['atom-core-ready','atom-core-data-changed','atom-team-activity-changed','atom-reference-data-changed','hashchange'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(recalc,0)));
+  window.ATOM_REQUIREMENT_PROGRESS_RULES={version:VERSION,install,isCounted,effectiveStatus,projectProgress,isTeamActive,countedRequirementsByTeam:countedByTeam,countedRequirementsByStage:countedByStage,recalc};
+  setTimeout(recalc,900);setTimeout(recalc,1800);
 })();
