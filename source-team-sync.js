@@ -1,5 +1,5 @@
 (function(){
-  const VERSION='1.0.0';
+  const VERSION='1.0.1';
   const CUSTOM_KEY='atom-custom-sources-v1';
   const CUSTOM_TEAM_PREFIX='atom-source-team-custom-';
   let installed=false;
@@ -21,16 +21,19 @@
     'B2B ручные лиды':['B2B продажи']
   };
 
-  const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+  const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#039;'}[m]));
   const read=(k,f)=>{try{const v=JSON.parse(localStorage.getItem(k)||'');return v??f}catch{return f}};
-  const write=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
   const core=()=>window.ATOM_CORE;
   const activity=()=>window.ATOM_TEAM_ACTIVITY;
   const teams=()=>core()?.teams?.()||[];
   const isTeamActive=team=>activity()?.isActive?activity().isActive(team):core()?.isTeamActive?core().isTeamActive(team):true;
   const customTeamKey=id=>`${CUSTOM_TEAM_PREFIX}${id}`;
 
-  function baseRows(){return Array.isArray(window.DATA?.sources_list)?DATA.sources_list:[];}
+  function projectData(){
+    try{if(typeof DATA!=='undefined'&&DATA)return DATA;}catch{}
+    return window.DATA||null;
+  }
+  function baseRows(){const d=projectData();return Array.isArray(d?.sources_list)?d.sources_list:[];}
   function customRows(){return read(CUSTOM_KEY,[]);}
   function baseTeams(index){
     const name=baseRows()[index]?.[0]||'';
@@ -127,21 +130,32 @@
     [...table.querySelectorAll('tbody tr')].forEach((row,rowIndex)=>{
       const customId=row.dataset.paCustomSource;
       const isCustom=Boolean(customId);
-      if(row.querySelector('[data-source-team-cell]')){
-        const state=row.querySelector('[data-source-state-cell]');
-        const active=isCustom?customActive(customRows().find(x=>String(x.id)===String(customId))||{id:customId}):baseActive(rowIndex);
+      const baseIndex=isCustom?-1:rowIndex;
+      const existingTeam=row.querySelector('[data-source-team-cell]');
+      const existingState=row.querySelector('[data-source-state-cell]');
+      let active=false;
+      if(isCustom){
+        const source=customRows().find(x=>String(x.id)===String(customId))||{id:customId};
+        active=customActive(source);
+        if(existingTeam){
+          const sel=existingTeam.querySelector('[data-source-custom-team]');
+          if(!sel)existingTeam.innerHTML=`<select class="source-team-select" data-source-custom-team="${esc(customId)}">${teamOptions(customTeam(customId))}</select>`;
+        }
+      }else{
+        active=baseActive(baseIndex);
+        if(existingTeam)existingTeam.innerHTML=`<span class="pa-note">${esc(linkedTeamLabel(baseIndex))}</span>`;
+      }
+      if(existingTeam){
         row.classList.toggle('source-sync-inactive',!active);
-        if(state)state.innerHTML=`<span class="source-sync-badge ${active?'':'off'}">${active?'Учитывается':'Исключён'}</span>`;
+        if(existingState)existingState.innerHTML=`<span class="source-sync-badge ${active?'':'off'}">${active?'Учитывается':'Исключён'}</span>`;
         return;
       }
       const teamTd=document.createElement('td');teamTd.dataset.sourceTeamCell='1';teamTd.className='source-sync-team';
       const stateTd=document.createElement('td');stateTd.dataset.sourceStateCell='1';stateTd.className='source-sync-state';
-      let active=false;
       if(isCustom){
         const team=customTeam(customId);teamTd.innerHTML=`<select class="source-team-select" data-source-custom-team="${esc(customId)}">${teamOptions(team)}</select>`;
-        const source=customRows().find(x=>String(x.id)===String(customId))||{id:customId};active=customActive(source);
       }else{
-        teamTd.innerHTML=`<span class="pa-note">${esc(linkedTeamLabel(rowIndex))}</span>`;active=baseActive(rowIndex);
+        teamTd.innerHTML=`<span class="pa-note">${esc(linkedTeamLabel(baseIndex))}</span>`;
       }
       stateTd.innerHTML=`<span class="source-sync-badge ${active?'':'off'}">${active?'Учитывается':'Исключён'}</span>`;
       row.insertBefore(teamTd,row.children[1]||null);row.insertBefore(stateTd,row.children[2]||null);
