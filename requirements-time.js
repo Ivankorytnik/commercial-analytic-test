@@ -1,5 +1,5 @@
 (function(){
-  const VERSION='1.2.1';
+  const VERSION='1.3.0';
   const META_PREFIX='atom-core-requirement-meta-';
   const BLOCKERS_KEY='atom-blockers';
   let patchedCore=false;
@@ -161,7 +161,7 @@
     const exact=Boolean(p?.customTimes);
     const startAt=exact?p.startAt:localFromDate(p?.startDate,false);
     const endAt=exact?p.endAt:localFromDate(p?.endDate,true);
-    return `<div class="req-period-view"><b>${fmtDateTime(startAt)} - ${fmtDateTime(endAt)}</b><br><span class="pa-note">${exact?'индивидуальный срок':'период этапа Ганта'}</span><br><button type="button" class="btn req-period-edit" data-id="${esc(req.id)}" style="margin-top:5px;padding:4px 7px;font-size:9px">Изменить</button>${exact?` <button type="button" class="btn req-period-reset" data-id="${esc(req.id)}" style="margin-top:5px;padding:4px 7px;font-size:9px">По Ганту</button>`:''}</div>`;
+    return `<div class="req-period-view"><b>${fmtDateTime(startAt)} - ${fmtDateTime(endAt)}</b><br><span class="pa-note">${exact?'срок требования':'срок требования'}</span><br><button type="button" class="btn req-period-edit" data-id="${esc(req.id)}" style="margin-top:5px;padding:4px 7px;font-size:9px">Изменить</button></div>`;
   }
 
   function editMarkup(req,p){

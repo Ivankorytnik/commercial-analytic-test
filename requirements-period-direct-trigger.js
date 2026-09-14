@@ -1,5 +1,5 @@
 (function(){
-  const VERSION='2.1.0';
+  const VERSION='2.2.0';
   let modal=null;
   let activeId='';
 
@@ -42,7 +42,7 @@
       <div class="req-period-modal-info">После сохранения начало устанавливается на 00:00, окончание на 23:59. Индивидуальный период используется для срока требования, просрочки и связанных блокеров.</div>
       <div class="req-period-modal-error" data-rpm-error></div>
       <div class="req-period-modal-actions">
-        <button type="button" class="btn" data-rpm-reset ${p.customTimes?'':'disabled'}>По Ганту</button>
+        <span></span>
         <div class="req-period-modal-right"><button type="button" class="btn" data-rpm-cancel>Отмена</button><button type="button" class="btn primary" data-rpm-save>Сохранить</button></div>
       </div>
     </div>`;
