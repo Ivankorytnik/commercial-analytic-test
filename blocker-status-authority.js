@@ -1,8 +1,8 @@
 (function(){
-  const VERSION='1.0.0';
+  const VERSION='1.1.0';
   const BLOCKERS_KEY='atom-blockers';
   const MANUAL_KEY='atom-blocker-manual-status-v1';
-  const nativeSet=Storage.prototype.setItem;
+  const syncSet=Storage.prototype.setItem;
   let restoring=false;
 
   const read=(key,fallback)=>{try{const v=JSON.parse(localStorage.getItem(key)||'');return v??fallback}catch{return fallback}};
@@ -22,28 +22,37 @@
     return changed;
   }
 
+  // Final guard for atom-blockers writes. Automatic modules may try to rewrite a manual
+  // status, but the final serialized value is compared with the current value before the
+  // sync layer is called. This prevents endless "Сохраняется" loops on identical data.
   Storage.prototype.setItem=function(key,value){
     if(this===window.localStorage&&String(key)===BLOCKERS_KEY){
       try{
         const rows=JSON.parse(String(value)||'[]');
         if(Array.isArray(rows)){
           mergeManual(rows);
-          return nativeSet.call(this,key,JSON.stringify(rows));
+          const serialized=JSON.stringify(rows);
+          if(localStorage.getItem(BLOCKERS_KEY)===serialized)return;
+          return syncSet.call(this,key,serialized);
         }
       }catch{}
     }
-    return nativeSet.call(this,key,value);
+    return syncSet.call(this,key,value);
   };
 
   function saveManual(id,status){
     if(!id||!status)return;
+    const rows=read(BLOCKERS_KEY,[]);
+    const b=rows.find(x=>String(x.id)===String(id));
     const map=manualMap();
+    const previous=map[String(id)];
+    const alreadyApplied=b&&b.status===status&&b.statusManual&&b.manualStatusValue===status;
+    if(previous?.status===status&&alreadyApplied)return;
+
     const updatedAt=new Date().toISOString();
     map[String(id)]={status,updatedAt};
     localStorage.setItem(MANUAL_KEY,JSON.stringify(map));
 
-    const rows=read(BLOCKERS_KEY,[]);
-    const b=rows.find(x=>String(x.id)===String(id));
     if(b){
       b.status=status;
       b.statusManual=true;
@@ -51,7 +60,7 @@
       b.statusManualAt=updatedAt;
       localStorage.setItem(BLOCKERS_KEY,JSON.stringify(rows));
     }
-    setTimeout(()=>{try{window.ATOM_SYNC?.flush?.();}catch{}},0);
+    window.dispatchEvent(new CustomEvent('atom-blocker-status-manual',{detail:{id,status}}));
   }
 
   function clearManual(id){
@@ -82,10 +91,9 @@
     if(btn)clearManual(btn.dataset.id);
   },true);
 
-  ['atom-sync-ready','atom-sync-update','atom-project-reconciled','hashchange','atom-blocker-status-manual'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(restore,0)));
+  ['atom-sync-ready','atom-sync-update','atom-project-reconciled','hashchange'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(restore,0)));
   setTimeout(restore,100);
   setTimeout(restore,800);
-  setTimeout(restore,1800);
 
   window.ATOM_BLOCKER_STATUS_AUTHORITY={version:VERSION,restore,saveManual};
 })();
