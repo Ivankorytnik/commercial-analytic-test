@@ -1,8 +1,9 @@
 (function(){
-  const VERSION='1.1.0';
+  const VERSION='1.2.0';
   const REF_KEY='atom-reference-data-v1';
   const GROUPS=[
     {key:'stage',title:'Статусы этапов'},
+    {key:'requirement',title:'Статусы требований'},
     {key:'blocker',title:'Статусы блокеров'},
     {key:'source',title:'Статусы источников'},
     {key:'severity',title:'Критичность блокеров'}
@@ -39,9 +40,7 @@
     return (items||[]).map(x=>`<option value="${esc(x)}" ${x===selected?'selected':''}>${esc(x)}</option>`).join('');
   }
 
-  function signature(refs){
-    return JSON.stringify(GROUPS.map(g=>[g.key,Array.isArray(refs[g.key])?refs[g.key]:[]]));
-  }
+  function signature(refs){return JSON.stringify(GROUPS.map(g=>[g.key,Array.isArray(refs[g.key])?refs[g.key]:[]]));}
 
   function hideLegacyCards(){
     const titles=new Set(GROUPS.map(x=>x.title));
@@ -53,72 +52,31 @@
 
   function renderEditor(force=false){
     if(!isDirectories())return;
-    const host=document.getElementById('pa-panel');
-    if(!host)return;
-    styles();
-    hideLegacyCards();
-    const refs=readRefs();
-    const sig=signature(refs);
+    const host=document.getElementById('pa-panel');if(!host)return;
+    styles();hideLegacyCards();
+    const refs=readRefs(),sig=signature(refs);
     let editor=document.getElementById('reference-directory-editor');
     if(editor&&!force&&editor.dataset.version===VERSION&&lastSignature===sig)return;
-
-    if(!editor){
-      editor=document.createElement('section');
-      editor.id='reference-directory-editor';
-      editor.className='ref-directory-editor';
-      host.appendChild(editor);
-    }
+    if(!editor){editor=document.createElement('section');editor.id='reference-directory-editor';editor.className='ref-directory-editor';host.appendChild(editor);}
     editor.dataset.version=VERSION;
-    editor.innerHTML=`
-      <div class="ref-directory-title"><div><h3>Системные справочники</h3><small>Нажмите на строку, чтобы развернуть или свернуть блок</small></div></div>
-      ${GROUPS.map(g=>{
-        const items=Array.isArray(refs[g.key])?refs[g.key]:[];
-        return `<details class="ref-accordion" data-ref-group="${g.key}" ${isOpen(g.key)?'open':''}>
-          <summary class="ref-accordion-head">
-            <span class="ref-accordion-name">${esc(g.title)}</span>
-            <span class="ref-accordion-meta"><span>${items.length} знач.</span><span class="ref-accordion-arrow">⌄</span></span>
-          </summary>
-          <div class="ref-accordion-body">
-            <div class="ref-directory-controls">
-              <div class="ref-field"><label>Текущие значения</label><select data-ref-select="${g.key}">${options(items)}</select></div>
-              <div class="ref-field"><label>Добавить новое значение</label><input data-ref-input="${g.key}" placeholder="Введите новый вариант"></div>
-              <button type="button" class="btn primary" data-ref-add="${g.key}">Добавить</button>
-            </div>
-            <div class="ref-directory-hint">Добавленное значение сохраняется в общем справочнике и синхронизируется между устройствами.</div>
-          </div>
-        </details>`;
-      }).join('')}`;
+    editor.innerHTML=`<div class="ref-directory-title"><div><h3>Системные справочники</h3><small>Нажмите на строку, чтобы развернуть или свернуть блок</small></div></div>${GROUPS.map(g=>{const items=Array.isArray(refs[g.key])?refs[g.key]:[];return `<details class="ref-accordion" data-ref-group="${g.key}" ${isOpen(g.key)?'open':''}><summary class="ref-accordion-head"><span class="ref-accordion-name">${esc(g.title)}</span><span class="ref-accordion-meta"><span>${items.length} знач.</span><span class="ref-accordion-arrow">⌄</span></span></summary><div class="ref-accordion-body"><div class="ref-directory-controls"><div class="ref-field"><label>Текущие значения</label><select data-ref-select="${g.key}">${options(items)}</select></div><div class="ref-field"><label>Добавить новое значение</label><input data-ref-input="${g.key}" placeholder="Введите новый вариант"></div><button type="button" class="btn primary" data-ref-add="${g.key}">Добавить</button></div><div class="ref-directory-hint">Добавленное значение сохраняется в общем справочнике и синхронизируется между устройствами.</div></div></details>`}).join('')}`;
     lastSignature=sig;
   }
 
   function addValue(key){
-    const input=document.querySelector(`[data-ref-input="${key}"]`);
-    const value=input?.value.trim();
+    const input=document.querySelector(`[data-ref-input="${key}"]`),value=input?.value.trim();
     if(!value)return alert('Введите новое значение');
-    const refs=readRefs();
-    const list=Array.isArray(refs[key])?refs[key].slice():[];
+    const refs=readRefs(),list=Array.isArray(refs[key])?refs[key].slice():[];
     if(list.some(x=>String(x).toLowerCase()===value.toLowerCase()))return alert('Такое значение уже есть');
-    list.push(value);
-    refs[key]=list;
-    setOpen(key,true);
-    writeRefs(refs);
-    lastSignature='';
-    renderEditor(true);
-    patchRuntimeDropdowns();
-    const select=document.querySelector(`[data-ref-select="${key}"]`);
-    if(select)select.value=value;
+    list.push(value);refs[key]=list;setOpen(key,true);writeRefs(refs);lastSignature='';renderEditor(true);patchRuntimeDropdowns();
+    const select=document.querySelector(`[data-ref-select="${key}"]`);if(select)select.value=value;
   }
 
   function syncSelect(select,items){
     if(!select||!Array.isArray(items))return;
-    const current=select.value;
-    const normalized=items.slice();
-    if(current&&!normalized.includes(current))normalized.push(current);
-    const sig=JSON.stringify(normalized);
-    if(select.dataset.refSignature===sig)return;
-    select.dataset.refSignature=sig;
-    select.innerHTML=options(normalized,current);
-    if(current)select.value=current;
+    const current=select.value,normalized=items.slice();if(current&&!normalized.includes(current))normalized.push(current);
+    const sig=JSON.stringify(normalized);if(select.dataset.refSignature===sig)return;
+    select.dataset.refSignature=sig;select.innerHTML=options(normalized,current);if(current)select.value=current;
   }
 
   function patchRuntimeDropdowns(){
@@ -127,49 +85,20 @@
     document.querySelectorAll('.source-status-select,[data-pa-source-status],[data-cs-status]').forEach(x=>syncSelect(x,refs.source||[]));
     document.querySelectorAll('.blocker-status').forEach(x=>syncSelect(x,refs.blocker||[]));
     document.querySelectorAll('.blocker-severity,#bl-severity').forEach(x=>syncSelect(x,refs.severity||[]));
+    window.ATOM_REQUIREMENTS_STATUS_DIRECTORY?.patch?.();
   }
 
-  document.addEventListener('toggle',e=>{
-    const details=e.target.closest?.('details[data-ref-group]');
-    if(!details)return;
-    setOpen(details.dataset.refGroup,details.open);
-  },true);
+  document.addEventListener('toggle',e=>{const details=e.target.closest?.('details[data-ref-group]');if(details)setOpen(details.dataset.refGroup,details.open);},true);
+  document.addEventListener('click',e=>{const add=e.target.closest('[data-ref-add]');if(add){e.preventDefault();e.stopPropagation();addValue(add.dataset.refAdd);}});
+  document.addEventListener('keydown',e=>{const input=e.target.closest('[data-ref-input]');if(input&&e.key==='Enter'){e.preventDefault();addValue(input.dataset.refInput);}});
 
-  document.addEventListener('click',e=>{
-    const add=e.target.closest('[data-ref-add]');
-    if(add){e.preventDefault();e.stopPropagation();addValue(add.dataset.refAdd);}
-  });
-
-  document.addEventListener('keydown',e=>{
-    const input=e.target.closest('[data-ref-input]');
-    if(input&&e.key==='Enter'){e.preventDefault();addValue(input.dataset.refInput);}
-  });
-
-  function patch(force=false){
-    if(queued)return;
-    queued=true;
-    requestAnimationFrame(()=>{
-      queued=false;
-      renderEditor(force);
-      patchRuntimeDropdowns();
-    });
-  }
-
-  const observer=new MutationObserver(()=>{
-    if(!isDirectories())return;
-    const host=document.getElementById('pa-panel');
-    const editor=document.getElementById('reference-directory-editor');
-    if(host&&!editor)patch(true);
-  });
+  function patch(force=false){if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;renderEditor(force);patchRuntimeDropdowns();});}
+  const observer=new MutationObserver(()=>{if(!isDirectories())return;const host=document.getElementById('pa-panel'),editor=document.getElementById('reference-directory-editor');if(host&&!editor)patch(true);});
   observer.observe(document.body,{childList:true,subtree:true});
-
   window.addEventListener('hashchange',()=>{lastSignature='';patch(true)});
   window.addEventListener('atom-sync-update',()=>{lastSignature='';patch(true)});
   window.addEventListener('atom-reference-data-changed',()=>{lastSignature='';patch(true)});
   window.addEventListener('atom-view-rendered',()=>patch(false));
-
   window.ATOM_REFERENCE_DIRECTORY_EDITOR={version:VERSION,patch:()=>patch(false),render:()=>renderEditor(true)};
-  styles();
-  setTimeout(()=>patch(true),400);
-  setTimeout(()=>patch(false),1200);
+  styles();setTimeout(()=>patch(true),400);setTimeout(()=>patch(false),1200);
 })();
