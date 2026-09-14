@@ -1,5 +1,5 @@
 (function(){
-  const VERSION='1.1.0';
+  const VERSION='1.2.0';
   const REF_KEY='atom-reference-data-v1';
   const NOT_ACTUAL='__not_actual__';
   const INACTIVE='__inactive__';
@@ -124,8 +124,6 @@
     patchCore();
     const value=select.value;
     const label=select.options[select.selectedIndex]?.textContent?.trim()||'';
-
-    // Manual selection is the authoritative status. This key is also cloud-synced.
     saveManual(id,value,label);
 
     if(value===NOT_ACTUAL||value===INACTIVE){
@@ -145,49 +143,16 @@
       c.setState?.(id,{statusId:value});
     }
 
-    // Keep the selected value visible immediately. Recalculation is triggered by the event once.
     select.value=value;
     window.dispatchEvent(new CustomEvent('atom-core-data-changed',{detail:{type:'requirement-status',id,status:value,label}}));
     setTimeout(patchSelects,0);
   }
 
-  function renderDirectoryGroup(){
-    if(!location.hash.startsWith('#management/directories'))return;
-    const editor=document.getElementById('reference-directory-editor');if(!editor)return;
-    let block=document.getElementById('requirement-status-directory');
-    const refs=ensureRefs(),items=refs.requirement||[];
-    if(!block){
-      block=document.createElement('details');
-      block.id='requirement-status-directory';
-      block.className='ref-accordion';
-      block.dataset.refGroup='requirement';
-      const first=editor.querySelector('details.ref-accordion');
-      if(first)first.insertAdjacentElement('afterend',block);else editor.appendChild(block);
-    }
-    const wasOpen=block.open||sessionStorage.getItem('ref-directory-open-requirement')==='1';
-    block.open=wasOpen;
-    block.innerHTML=`<summary class="ref-accordion-head"><span class="ref-accordion-name">Статусы требований</span><span class="ref-accordion-meta"><span>${items.length} знач.</span><span class="ref-accordion-arrow">⌄</span></span></summary><div class="ref-accordion-body"><div class="ref-directory-controls"><div class="ref-field"><label>Текущие значения</label><select id="requirement-ref-select">${items.map(x=>`<option>${esc(x)}</option>`).join('')}</select></div><div class="ref-field"><label>Добавить новое значение</label><input id="requirement-ref-input" placeholder="Введите новый статус требования"></div><button type="button" class="btn primary" id="requirement-ref-add">Добавить</button></div><div class="ref-directory-hint">Эти значения используются в выпадающем списке «Статус» раздела «Требования». «Не актуально» и «Не активно» исключают требование из расчетной логики.</div></div>`;
+  function removeLegacyDuplicate(){
+    const duplicate=document.getElementById('requirement-status-directory');
+    if(duplicate)duplicate.remove();
   }
 
-  function addDirectoryValue(){
-    const input=document.getElementById('requirement-ref-input');
-    const value=input?.value.trim();if(!value)return alert('Введите новый статус требования');
-    const refs=ensureRefs();
-    if(refs.requirement.some(x=>norm(x)===norm(value)))return alert('Такой статус уже есть');
-    refs.requirement.push(value);writeRefs(refs);
-    sessionStorage.setItem('ref-directory-open-requirement','1');
-    renderDirectoryGroup();patchSelects();
-  }
-
-  document.addEventListener('toggle',e=>{
-    if(e.target?.id==='requirement-status-directory')sessionStorage.setItem('ref-directory-open-requirement',e.target.open?'1':'0');
-  },true);
-  document.addEventListener('click',e=>{
-    if(e.target.closest('#requirement-ref-add')){e.preventDefault();addDirectoryValue();}
-  });
-  document.addEventListener('keydown',e=>{
-    if(e.target.closest('#requirement-ref-input')&&e.key==='Enter'){e.preventDefault();addDirectoryValue();}
-  });
   document.addEventListener('change',e=>{
     const select=e.target.closest('[data-req-enh-status],select[data-pa-req-status],.core-raci-table select[data-core-field="statusId"]');
     if(!select)return;
@@ -195,7 +160,7 @@
     applyStatus(select);
   },true);
 
-  function patch(){patchCore();ensureRefs();renderDirectoryGroup();patchSelects();}
+  function patch(){patchCore();ensureRefs();removeLegacyDuplicate();patchSelects();}
   function queue(){if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;patch();});}
   new MutationObserver(queue).observe(document.body,{childList:true,subtree:true});
   ['hashchange','atom-sync-update','atom-view-rendered','atom-core-data-changed','atom-reference-data-changed'].forEach(ev=>window.addEventListener(ev,queue));
