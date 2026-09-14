@@ -1,5 +1,5 @@
 (function(){
-  const VERSION='1.0.0';
+  const VERSION='1.1.0';
   const HASH='#status-mailer';
   const BLOCKERS_KEY='atom-blockers';
   let queued=false;
@@ -97,7 +97,6 @@
       return {person,requirements:assigned,blockers:personBlockers,teams:teamOwnership(person.name)};
     }).filter(x=>x.requirements.length||x.blockers.length);
 
-    // Preserve any blocker owner that is not yet in the people directory.
     const knownNames=new Set(rows.map(x=>x.person.name));
     blockers.forEach(b=>{
       const name=String(b.owner||'').trim();
@@ -139,23 +138,20 @@
     const today=fmtDate(new Date(),false);
     const first=shortName(row.person.name);
     const activeReq=row.requirements.filter(x=>x.state.statusId!=='done');
-    const doneReq=row.requirements.filter(x=>x.state.statusId==='done');
+    const doneCount=row.requirements.filter(x=>x.state.statusId==='done').length;
     const overdue=activeReq.filter(x=>x.deadline.overdue).length;
     const subject=`АТОМ | Актуализация статусов задач | ${today}`;
     const body=[];
     body.push(`${first}, добрый день!`,'',`Прошу актуализировать статусы по задачам, которые закреплены за вами в проекте «Коммерческая аналитика АТОМ».`,`По состоянию на ${today}:`,'');
     if(row.teams.length)body.push(`Зоны ответственности: ${row.teams.join(', ')}`,'');
+    body.push('СТАТУС:',`В работе - ${activeReq.length}`,`Просрочено - ${overdue}`,`Готово - ${doneCount}`,`Активных блокеров - ${row.blockers.length}`,'');
     if(activeReq.length){
-      body.push(`ЗАДАЧИ В РАБОТЕ: ${activeReq.length}${overdue?`, просрочено: ${overdue}`:''}`,'');
+      body.push('ЗАДАЧИ В РАБОТЕ:','');
       activeReq.forEach((x,i)=>{body.push(requirementLine(x,i),'');});
     }
     if(row.blockers.length){
-      body.push(`АКТИВНЫЕ БЛОКЕРЫ: ${row.blockers.length}`,'');
+      body.push('АКТИВНЫЕ БЛОКЕРЫ:','');
       row.blockers.forEach((x,i)=>{body.push(blockerLine(x,i),'');});
-    }
-    if(doneReq.length){
-      body.push(`ГОТОВО: ${doneReq.length}`,'');
-      doneReq.forEach((x,i)=>{body.push(requirementLine(x,i),'');});
     }
     body.push('Просьба проверить статусы и при необходимости направить актуальный комментарий и срок.','','Спасибо!','Иван Корытник');
     return{subject,body:body.join('\n')};
