@@ -28,7 +28,7 @@
       <h1>Управление внедрением коммерческой аналитики АТОМ</h1>
       <p>Единый центр управления внедрением от источника лида до BI-дашборда</p>
       <div class="build-meta">
-        <span>Версия <b>v1.13.1 FAST START</b></span>
+        <span>Версия <b>v1.14.0 DIRECTOR PDF</b></span>
         <span>Обновлено <b>14.09.2026</b></span>
       </div>
     </div>
@@ -48,6 +48,7 @@
       <button class="nav" data-view="gantt">Диаграмма Ганта</button>
       <button class="nav" data-view="issues">Блокеры</button>
       <button class="nav" data-view="dod">Definition of Done</button>
+      <button id="director-onepage-pdf-btn" class="director-pdf-nav" type="button">One-page PDF для директора</button>
       <div class="nav-info-separator">Информация</div>
       <button class="nav" data-view="funnel">Сквозной путь</button>
     </aside>
@@ -62,105 +63,25 @@
       let sourcesReady=false;
       let progressReady=false;
       let revealTimer=null;
-
-      function markFromGlobals(){
-        if(window.ATOM_SOURCE_TEAM_SYNC?.summary)sourcesReady=true;
-        if(window.ATOM_REQUIREMENT_PROGRESS_RULES?.projectProgress)progressReady=true;
-      }
-
-      function revealFinal(){
-        if(revealed)return;
-        markFromGlobals();
-        if(!sourcesReady||!progressReady)return;
-        clearTimeout(revealTimer);
-        revealTimer=setTimeout(()=>{
-          try{window.ATOM_REQUIREMENT_PROGRESS_RULES?.recalc?.();}catch{}
-          setTimeout(()=>{
-            try{window.ATOM_REQUIREMENT_PROGRESS_RULES?.recalc?.();}catch{}
-            if(revealed)return;
-            revealed=true;
-            requestAnimationFrame(()=>requestAnimationFrame(()=>document.body.classList.remove('logic-pending')));
-          },120);
-        },80);
-      }
-
+      function markFromGlobals(){if(window.ATOM_SOURCE_TEAM_SYNC?.summary)sourcesReady=true;if(window.ATOM_REQUIREMENT_PROGRESS_RULES?.projectProgress)progressReady=true;}
+      function revealFinal(){if(revealed)return;markFromGlobals();if(!sourcesReady||!progressReady)return;clearTimeout(revealTimer);revealTimer=setTimeout(()=>{try{window.ATOM_REQUIREMENT_PROGRESS_RULES?.recalc?.();}catch{}setTimeout(()=>{try{window.ATOM_REQUIREMENT_PROGRESS_RULES?.recalc?.();}catch{}if(revealed)return;revealed=true;requestAnimationFrame(()=>requestAnimationFrame(()=>document.body.classList.remove('logic-pending')));},120);},80);}
       window.addEventListener('atom-source-team-sync-ready',()=>{sourcesReady=true;revealFinal();});
       window.addEventListener('atom-project-progress-rules-ready',()=>{progressReady=true;revealFinal();});
       window.addEventListener('atom-source-activity-changed',()=>{sourcesReady=true;revealFinal();});
-
-      const readinessPoll=setInterval(()=>{
-        markFromGlobals();
-        if(sourcesReady&&progressReady){clearInterval(readinessPoll);revealFinal();}
-      },50);
-
-      setTimeout(()=>{
-        clearInterval(readinessPoll);
-        markFromGlobals();
-        if(sourcesReady&&progressReady)revealFinal();
-        else{
-          try{window.ATOM_REQUIREMENT_PROGRESS_RULES?.recalc?.();}catch{}
-          revealed=true;
-          document.body.classList.remove('logic-pending');
-        }
-      },1800);
+      const readinessPoll=setInterval(()=>{markFromGlobals();if(sourcesReady&&progressReady){clearInterval(readinessPoll);revealFinal();}},50);
+      setTimeout(()=>{clearInterval(readinessPoll);markFromGlobals();if(sourcesReady&&progressReady)revealFinal();else{try{window.ATOM_REQUIREMENT_PROGRESS_RULES?.recalc?.();}catch{}revealed=true;document.body.classList.remove('logic-pending');}},1800);
     })();
   </script>
   <script src="sync-status.js?v=1.2.1"></script>
   <script src="sync-storage.js?v=2.1.0"></script>
+  <script src="director-onepage-pdf.js?v=1.0.0"></script>
   <script>
     (function(){
       let started=false;
       function loadApp(){
         if(started)return;started=true;
         [
-          'app.js?v=0.7.2-sync',
-          'reference-bootstrap.js?v=1.5.0',
-          'gantt-readiness.js?v=0.8.3-sync',
-          'gantt-compact-status.js?v=0.9.0-sync',
-          'logic-core.js?v=1.2.0',
-          'requirements-authority.js?v=1.0.0',
-          'project-countdown.js?v=1.0.0',
-          'faq.js?v=0.7.4-sync',
-          'weekly-report.js?v=1.4.0',
-          'security.js?v=0.8.7-sync',
-          'logic-core-ui-fast.js?v=1.2.2',
-          'project-admin.js?v=1.3.2',
-          'project-admin-requirement-time.js?v=1.0.1',
-          'person-team-role.js?v=1.0.0',
-          'team-activity.js?v=1.0.0',
-          'team-activity-fix.js?v=1.2.1',
-          'team-activity-ui.js?v=1.0.0',
-          'source-team-sync.js?v=1.0.1',
-          'reference-directory-editor.js?v=1.2.0',
-          'requirements-enhanced.js?v=2.0.0',
-          'requirements-period-editor.js?v=2.0.0',
-          'requirements-time.js?v=1.3.0',
-          'requirements-period-direct-trigger.js?v=2.2.0',
-          'requirements-status-directory.js?v=1.3.0',
-          'requirements-status-colors.js?v=1.1.0',
-          'requirements-all-team-filter.js?v=1.2.0',
-          'requirements-filter-persistence.js?v=1.2.0',
-          'requirements-interaction-stability.js?v=1.0.0',
-          'requirements-stable-dropdowns.js?v=1.0.0',
-          'overview-team-requirements-link.js?v=1.1.0',
-          'expanded-gantt-team-filter.js?v=1.1.0',
-          'logic-cleanup.js?v=1.3.0',
-          'requirement-progress-rules.js?v=1.2.0',
-          'blocker-status-authority.js?v=1.1.0',
-          'blockers-all-view.js?v=1.1.0',
-          'requirement-blocker-live-sync.js?v=1.0.0',
-          'overview-blockers-kpi.js?v=1.0.0',
-          'overview-today-requirements.js?v=2.0.0',
-          'overview-hide-goal.js?v=1.0.0',
-          'overview-kpi-compact.js?v=1.0.0',
-          'status-mailer.js?v=1.1.0',
-          'status-mailer-gmail-selection.js?v=1.0.0',
-          'management-navigation.js?v=1.3.1',
-          'information-current.js?v=1.0.0',
-          'faq-project-progress.js?v=1.0.0',
-          'final-consistency.js?v=1.0.0',
-          'requirements-derived-views.js?v=1.0.0',
-          'prod-release-controls.js?v=1.0.0'
+          'app.js?v=0.7.2-sync','reference-bootstrap.js?v=1.5.0','gantt-readiness.js?v=0.8.3-sync','gantt-compact-status.js?v=0.9.0-sync','logic-core.js?v=1.2.0','requirements-authority.js?v=1.0.0','project-countdown.js?v=1.0.0','faq.js?v=0.7.4-sync','weekly-report.js?v=1.4.0','security.js?v=0.8.7-sync','logic-core-ui-fast.js?v=1.2.2','project-admin.js?v=1.3.2','project-admin-requirement-time.js?v=1.0.1','person-team-role.js?v=1.0.0','team-activity.js?v=1.0.0','team-activity-fix.js?v=1.2.1','team-activity-ui.js?v=1.0.0','source-team-sync.js?v=1.0.1','reference-directory-editor.js?v=1.2.0','requirements-enhanced.js?v=2.0.0','requirements-period-editor.js?v=2.0.0','requirements-time.js?v=1.3.0','requirements-period-direct-trigger.js?v=2.2.0','requirements-status-directory.js?v=1.3.0','requirements-status-colors.js?v=1.1.0','requirements-all-team-filter.js?v=1.2.0','requirements-filter-persistence.js?v=1.2.0','requirements-interaction-stability.js?v=1.0.0','requirements-stable-dropdowns.js?v=1.0.0','overview-team-requirements-link.js?v=1.1.0','expanded-gantt-team-filter.js?v=1.1.0','logic-cleanup.js?v=1.3.0','requirement-progress-rules.js?v=1.2.0','blocker-status-authority.js?v=1.1.0','blockers-all-view.js?v=1.1.0','requirement-blocker-live-sync.js?v=1.0.0','overview-blockers-kpi.js?v=1.0.0','overview-today-requirements.js?v=2.0.0','overview-hide-goal.js?v=1.0.0','overview-kpi-compact.js?v=1.0.0','status-mailer.js?v=1.1.0','status-mailer-gmail-selection.js?v=1.0.0','management-navigation.js?v=1.3.1','information-current.js?v=1.0.0','faq-project-progress.js?v=1.0.0','final-consistency.js?v=1.0.0','requirements-derived-views.js?v=1.0.0','prod-release-controls.js?v=1.0.0'
         ].forEach(src=>{const s=document.createElement('script');s.src=src;s.async=false;document.body.appendChild(s);});
       }
       window.addEventListener('atom-sync-ready',loadApp,{once:true});
