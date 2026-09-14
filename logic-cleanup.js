@@ -1,5 +1,5 @@
 (function(){
-  const VERSION='1.2.0';
+  const VERSION='1.3.0';
   const BLOCKERS_KEY='atom-blockers';
   const NOT_ACTUAL='__not_actual__';
   let installed=false;
@@ -17,6 +17,7 @@
   };
   const isActiveTeam=team=>activity()?.isActive?activity().isActive(team):true;
   const hasManualStatus=b=>Boolean(b?.statusManual);
+  const manualStatusValue=b=>String(b?.manualStatusValue||'').trim();
 
   function allRequirements(){
     const c=core();if(!c)return[];
@@ -40,6 +41,18 @@
     });
   }
 
+  function restoreManualStatuses(blockers){
+    let changed=false;
+    (blockers||[]).forEach(b=>{
+      const manual=manualStatusValue(b);
+      if(hasManualStatus(b)&&manual&&b.status!==manual){
+        b.status=manual;
+        changed=true;
+      }
+    });
+    return changed;
+  }
+
   function canonicalReconcile(){
     const c=core();if(!c||reconciling)return false;
     reconciling=true;
@@ -53,6 +66,7 @@
       }
 
       const blockers=read(BLOCKERS_KEY,[]);
+      if(restoreManualStatuses(blockers))changed=true;
       const reqs=allRequirements();
       const known=new Set(reqs.map(r=>`CORE:RACI:${r.id}`));
 
@@ -102,6 +116,7 @@
         }
       });
 
+      if(restoreManualStatuses(blockers))changed=true;
       if(changed)write(BLOCKERS_KEY,blockers);
     }finally{reconciling=false;}
     if(changed)window.dispatchEvent(new CustomEvent('atom-project-reconciled'));
@@ -116,6 +131,7 @@
     if(!blocker)return;
     blocker.status=select.value;
     blocker.statusManual=true;
+    blocker.manualStatusValue=select.value;
     blocker.statusManualAt=new Date().toISOString();
     write(BLOCKERS_KEY,blockers);
     window.dispatchEvent(new CustomEvent('atom-blocker-status-manual',{detail:{id:blocker.id,status:blocker.status}}));
@@ -190,6 +206,7 @@
     const blockerStatus=e.target.closest('.blocker-status');
     if(blockerStatus){
       markBlockerStatusManual(blockerStatus);
+      setTimeout(()=>canonicalReconcile(),0);
       return;
     }
     if(e.target.closest('[data-team-active]'))e.stopPropagation();
@@ -206,7 +223,7 @@
 
   function queue(){if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;patch();});}
   new MutationObserver(queue).observe(document.body,{childList:true,subtree:true});
-  ['hashchange','atom-core-ready','atom-sync-update','atom-view-rendered','atom-core-data-changed','atom-team-activity-changed','atom-reference-data-changed'].forEach(ev=>window.addEventListener(ev,queue));
-  window.ATOM_LOGIC_CLEANUP={version:VERSION,reconcile:canonicalReconcile,patch,isNotActual};
+  ['hashchange','atom-core-ready','atom-sync-update','atom-view-rendered','atom-core-data-changed','atom-team-activity-changed','atom-reference-data-changed','atom-blocker-status-manual'].forEach(ev=>window.addEventListener(ev,queue));
+  window.ATOM_LOGIC_CLEANUP={version:VERSION,reconcile:canonicalReconcile,patch,isNotActual,restoreManualStatuses};
   styles();setTimeout(queue,500);setTimeout(queue,1400);
 })();
