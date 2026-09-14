@@ -1,8 +1,9 @@
 (function(){
-  const VERSION='1.1.0';
+  const VERSION='1.2.0';
   const META_PREFIX='atom-core-requirement-meta-';
   const BLOCKERS_KEY='atom-blockers';
   let patchedCore=false;
+  let queued=false;
   const original={};
 
   const core=()=>window.ATOM_CORE;
@@ -13,7 +14,10 @@
   const isNotActual=id=>core()?.isRequirementNotActual?.(id)||localStorage.getItem(`atom-requirement-not-actual-${id}`)==='1';
   const isActiveTeam=team=>activity()?.isActive?activity().isActive(team):true;
   const pad=n=>String(n).padStart(2,'0');
-  const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+  const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#039;'}[m]));
+  const interactiveSelector='[data-req-enh-status],select[data-pa-req-status],[data-req-enh-person],select[data-pa-req-person],#req-enh-team,#pa-req-team,[data-req-enh-stage],select[data-pa-req-stage]';
+  const editingSelect=()=>{const el=document.activeElement;return Boolean(el?.matches?.(interactiveSelector));};
+  const setHtml=(el,html)=>{if(el&&el.innerHTML!==html)el.innerHTML=html;};
 
   function parseLocal(value,endOfDay=false){
     if(!value)return NaN;
@@ -53,7 +57,6 @@
     return `<span class="req-enh-due ${past?'overdue':''}">${past?'Просрочено ':'Осталось '}${parts.join(' ')}</span>`;
   }
 
-  // Individual period override is now available for ANY requirement, not only custom ones.
   function customPeriod(req){
     if(!req)return null;
     const m=meta(req.id)||{};
@@ -133,7 +136,7 @@
   }
 
   function stageDefaults(){
-    const c=core(),stage=Number(document.getElementById('req-enh-new-stage')?.value||1),p=original.periodForRequirement?original.periodForRequirement({id:'__new-time__',stageId:stage,custom:false}):null;
+    const stage=Number(document.getElementById('req-enh-new-stage')?.value||1),p=original.periodForRequirement?original.periodForRequirement({id:'__new-time__',stageId:stage,custom:false}):null;
     let start='',end='';
     if(p?.start&&Number.isFinite(Number(p.start)))start=localInput(p.start,false);else start=localFromDate(p?.startDate,false);
     if(p?.end&&Number.isFinite(Number(p.end)))end=localInput(p.end,true);else end=localFromDate(p?.endDate,true);
@@ -141,7 +144,7 @@
   }
 
   function patchForm(){
-    if(!location.hash.startsWith('#management/requirements'))return;
+    if(!location.hash.startsWith('#management/requirements')||editingSelect())return;
     const start=document.getElementById('req-enh-new-start'),end=document.getElementById('req-enh-new-end');if(!start||!end)return;
     if(start.type!=='datetime-local'){
       const d=stageDefaults();
@@ -166,19 +169,19 @@
   }
 
   function patchRows(){
-    const c=core();if(!c||!location.hash.startsWith('#management/requirements'))return;
+    const c=core();if(!c||!location.hash.startsWith('#management/requirements')||editingSelect())return;
 
     const enhanced=document.querySelector('.req-enh-table');
     if(enhanced){
-      const th=enhanced.querySelectorAll('thead th');if(th[5])th[5].textContent='До закрытия';
+      const th=enhanced.querySelectorAll('thead th');if(th[5]&&th[5].textContent!=='До закрытия')th[5].textContent='До закрытия';
       const body=enhanced.querySelector('tbody'),rows=[...body.querySelectorAll('tr[data-req-enh-row]')];
       rows.forEach(row=>{
         const id=row.dataset.reqEnhRow,req=c.requirement(id);if(!req)return;
         const p=c.periodForRequirement(req),st=c.getState(id),na=isNotActual(id),inactive=!isActiveTeam(req.team),exact=Boolean(p?.customTimes);
         const cells=row.children;
-        if(cells[3]&&!cells[3].querySelector('.req-period-editor'))cells[3].innerHTML=periodMarkup(req,p);
-        if(cells[4])cells[4].innerHTML=`<b>${fmtDateTime(exact?p.endAt:localFromDate(p?.endDate,true))}</b>`;
-        if(cells[5])cells[5].innerHTML=na?'<span class="req-enh-due na">Не учитывается</span>':st.statusId==='done'?'<span class="req-enh-due done">Готово</span>':preciseRemaining(Number(p?.end));
+        if(cells[3]&&!cells[3].querySelector('.req-period-editor'))setHtml(cells[3],periodMarkup(req,p));
+        if(cells[4])setHtml(cells[4],`<b>${fmtDateTime(exact?p.endAt:localFromDate(p?.endDate,true))}</b>`);
+        if(cells[5])setHtml(cells[5],na?'<span class="req-enh-due na">Не учитывается</span>':st.statusId==='done'?'<span class="req-enh-due done">Готово</span>':preciseRemaining(Number(p?.end)));
         const overdue=!na&&!inactive&&st.statusId!=='done'&&Number.isFinite(Number(p?.end))&&Date.now()>Number(p.end);
         row.classList.toggle('req-enh-overdue',overdue);
         row.dataset.reqEndTs=String(Number.isFinite(Number(p?.end))?Number(p.end):Number.MAX_SAFE_INTEGER);
@@ -187,12 +190,11 @@
       if(ordered.some((r,i)=>r!==rows[i]))ordered.forEach(r=>body.appendChild(r));
     }
 
-    // Current Project Admin requirements table (including the "Все" team filter).
     document.querySelectorAll('#pa-panel tr[data-pa-req]').forEach(row=>{
       const id=row.dataset.paReq,req=c.requirement(id);if(!req)return;
       const cell=row.children[2];if(!cell||cell.querySelector('.req-period-editor'))return;
       const p=c.periodForRequirement(req);
-      cell.innerHTML=periodMarkup(req,p);
+      setHtml(cell,periodMarkup(req,p));
     });
   }
 
@@ -269,15 +271,24 @@
     }
 
     const reset=e.target.closest('.req-period-reset');
-    if(reset){
-      if(confirm('Вернуть период требования к сроку этапа Ганта?')){resetTimes(reset.dataset.id);rerenderAfterPeriodChange();}
-    }
+    if(reset&&confirm('Вернуть период требования к сроку этапа Ганта?')){resetTimes(reset.dataset.id);rerenderAfterPeriodChange();}
   },true);
 
-  let queued=false;
-  function patch(){if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;if(!patchCore())return;patchForm();patchRows();});}
-  new MutationObserver(patch).observe(document.body,{childList:true,subtree:true});
+  function patch(){
+    if(queued)return;
+    queued=true;
+    requestAnimationFrame(()=>{
+      queued=false;
+      if(!patchCore())return;
+      if(editingSelect())return;
+      patchForm();patchRows();
+    });
+  }
+
+  // Important: no global MutationObserver here. It caused continuous DOM rewrites in the
+  // requirements table and closed native select dropdowns immediately after opening.
   ['hashchange','atom-core-ready','atom-sync-update','atom-view-rendered','atom-core-data-changed'].forEach(ev=>window.addEventListener(ev,patch));
+  document.addEventListener('focusout',e=>{if(e.target?.matches?.(interactiveSelector))setTimeout(patch,80);},true);
   window.ATOM_REQUIREMENTS_TIME={version:VERSION,patch,saveTimes,resetTimes,customPeriod};
   setTimeout(patch,500);setTimeout(patch,1200);
 })();
