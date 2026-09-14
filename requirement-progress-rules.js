@@ -1,5 +1,5 @@
 (function(){
-  const VERSION='1.1.0';
+  const VERSION='1.2.0';
   const NOT_ACTUAL='__not_actual__';
   const QUEUE='__inactive__';
   let installed=false;
@@ -23,10 +23,12 @@
     return c?.getState?.(req.id)?.statusId||'not_requested';
   }
 
+  // Completed requirements remain in the calculation and contribute 100%.
+  // Only explicitly excluded requirements and inactive teams are removed.
   function isCounted(req){
     if(!req||!isTeamActive(req.team))return false;
     const status=effectiveStatus(req);
-    return ![NOT_ACTUAL,QUEUE,'done'].includes(status);
+    return ![NOT_ACTUAL,QUEUE].includes(status);
   }
 
   function rawByTeam(team){
@@ -55,34 +57,38 @@
   }
 
   function teamSummary(team){
-    const c=core(),active=isTeamActive(team);
-    const all=rawByTeam(team);
+    const c=core(),active=isTeamActive(team),all=rawByTeam(team);
+    const allDone=all.filter(r=>effectiveStatus(r)==='done').length;
     if(!active){
       return {
         team,teamId:c.TEAM_IDS?.[team]||team,total:0,progress:0,done:0,work:0,problem:0,
         owner:c.teamOwner(team),active:false,excluded:true,
         excludedInactive:all.length,
-        excludedDone:all.filter(r=>effectiveStatus(r)==='done').length,
+        excludedDone:0,
+        completedDone:allDone,
         excludedQueue:all.filter(r=>effectiveStatus(r)===QUEUE).length,
         excludedNotActual:all.filter(r=>effectiveStatus(r)===NOT_ACTUAL).length
       };
     }
-    const rows=countedByTeam(team),states=rows.map(r=>c.getState(r.id));
+    const rows=countedByTeam(team);
+    const statuses=rows.map(effectiveStatus);
     const total=rows.length;
     const progress=total?Math.round(rows.reduce((n,r)=>n+requirementProgress(r.id),0)/total):0;
+    const done=statuses.filter(x=>x==='done').length;
     return {
       team,
       teamId:c.TEAM_IDS?.[team]||team,
       total,
       progress,
-      done:0,
-      work:states.filter(x=>x.statusId!=='not_requested').length,
+      done,
+      work:statuses.filter(x=>!['not_requested','done'].includes(x)).length,
       problem:rows.filter(requirementProblem).length,
       owner:c.teamOwner(team),
       active:true,
       excluded:false,
       excludedInactive:0,
-      excludedDone:all.filter(r=>effectiveStatus(r)==='done').length,
+      excludedDone:0,
+      completedDone:done,
       excludedQueue:all.filter(r=>effectiveStatus(r)===QUEUE).length,
       excludedNotActual:all.filter(r=>effectiveStatus(r)===NOT_ACTUAL).length
     };
@@ -95,7 +101,7 @@
       total:rows.length,
       progress:Math.round(rows.reduce((n,r)=>n+requirementProgress(r.id),0)/rows.length),
       problem:rows.some(requirementProblem),
-      done:0
+      done:rows.filter(r=>effectiveStatus(r)==='done').length
     };
   }
 
@@ -172,7 +178,7 @@
     updateHeader();
   }
 
-  ['atom-core-ready','atom-core-data-changed','atom-team-activity-changed','atom-reference-data-changed','hashchange'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(recalc,0)));
+  ['atom-core-ready','atom-core-data-changed','atom-team-activity-changed','atom-reference-data-changed','atom-source-activity-changed','hashchange'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(recalc,0)));
   window.ATOM_REQUIREMENT_PROGRESS_RULES={version:VERSION,install,isCounted,effectiveStatus,projectProgress,isTeamActive,countedRequirementsByTeam:countedByTeam,countedRequirementsByStage:countedByStage,recalc};
   setTimeout(recalc,900);setTimeout(recalc,1800);
 })();
