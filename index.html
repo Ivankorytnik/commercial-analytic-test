@@ -16,18 +16,20 @@
     .header-status{flex-direction:row;align-items:center;justify-content:flex-end;gap:10px;min-width:0;flex-wrap:nowrap}
     .project-progress-box{width:220px;flex:0 0 220px;padding:10px 12px}
     .status-pill{white-space:nowrap;flex:0 0 auto}
+    body.logic-pending .content,body.logic-pending .project-progress-box{visibility:hidden}
+    body.logic-pending .content{min-height:320px}
     @media(max-width:1100px){.topbar{flex-direction:column}.header-status{width:100%;justify-content:flex-start;flex-wrap:wrap}.project-progress-box{width:220px}}
     @media(max-width:600px){.header-status{align-items:flex-start}.project-progress-box{width:100%;flex-basis:100%}}
   </style>
 </head>
-<body>
+<body class="logic-pending">
   <header class="topbar">
     <div>
       <div class="eyebrow">АТОМ · Commercial Analytics</div>
       <h1>Управление внедрением коммерческой аналитики АТОМ</h1>
       <p>Единый центр управления внедрением от источника лида до BI-дашборда</p>
       <div class="build-meta">
-        <span>Версия <b>v1.8.5 DROPDOWN STABILITY</b></span>
+        <span>Версия <b>v1.8.6 UI STABILITY</b></span>
         <span>Обновлено <b>14.09.2026</b></span>
       </div>
     </div>
@@ -55,6 +57,20 @@
   </main>
 
   <footer>Тестовая версия. Данные проекта синхронизируются между устройствами через облачное хранилище.</footer>
+  <script>
+    (function(){
+      let revealed=false;
+      function reveal(){
+        if(revealed)return;revealed=true;
+        requestAnimationFrame(()=>requestAnimationFrame(()=>document.body.classList.remove('logic-pending')));
+      }
+      window.addEventListener('atom-project-progress-rules-ready',()=>setTimeout(reveal,80),{once:true});
+      window.addEventListener('atom-core-ready',()=>setTimeout(()=>{
+        if(window.ATOM_REQUIREMENT_PROGRESS_RULES?.projectProgress)reveal();
+      },1400),{once:true});
+      setTimeout(reveal,7000);
+    })();
+  </script>
   <script src="sync-status.js?v=1.2.1"></script>
   <script src="sync-storage.js?v=2.1.0"></script>
   <script>
@@ -86,6 +102,7 @@
           'requirements-status-colors.js?v=1.1.0',
           'requirements-all-team-filter.js?v=1.1.0',
           'requirements-filter-persistence.js?v=1.2.0',
+          'requirements-interaction-stability.js?v=1.0.0',
           'overview-team-requirements-link.js?v=1.1.0',
           'expanded-gantt-team-filter.js?v=1.0.0',
           'logic-cleanup.js?v=1.3.0',
