@@ -29,7 +29,7 @@
       <h1>Управление внедрением коммерческой аналитики АТОМ</h1>
       <p>Единый центр управления внедрением от источника лида до BI-дашборда</p>
       <div class="build-meta">
-        <span>Версия <b>v1.9.1 ACTIVE SOURCES FIX</b></span>
+        <span>Версия <b>v1.9.2 FINAL PROGRESS BOOT</b></span>
         <span>Обновлено <b>14.09.2026</b></span>
       </div>
     </div>
@@ -60,15 +60,50 @@
   <script>
     (function(){
       let revealed=false;
-      function reveal(){
-        if(revealed)return;revealed=true;
-        requestAnimationFrame(()=>requestAnimationFrame(()=>document.body.classList.remove('logic-pending')));
+      let sourcesReady=false;
+      let progressReady=false;
+      let revealTimer=null;
+
+      function markFromGlobals(){
+        if(window.ATOM_SOURCE_TEAM_SYNC?.summary)sourcesReady=true;
+        if(window.ATOM_REQUIREMENT_PROGRESS_RULES?.projectProgress)progressReady=true;
       }
-      window.addEventListener('atom-project-progress-rules-ready',()=>setTimeout(reveal,80),{once:true});
-      window.addEventListener('atom-core-ready',()=>setTimeout(()=>{
-        if(window.ATOM_REQUIREMENT_PROGRESS_RULES?.projectProgress)reveal();
-      },1400),{once:true});
-      setTimeout(reveal,7000);
+
+      function revealFinal(){
+        if(revealed)return;
+        markFromGlobals();
+        if(!sourcesReady||!progressReady)return;
+        clearTimeout(revealTimer);
+        revealTimer=setTimeout(()=>{
+          try{window.ATOM_REQUIREMENT_PROGRESS_RULES?.recalc?.();}catch{}
+          setTimeout(()=>{
+            try{window.ATOM_REQUIREMENT_PROGRESS_RULES?.recalc?.();}catch{}
+            if(revealed)return;
+            revealed=true;
+            requestAnimationFrame(()=>requestAnimationFrame(()=>document.body.classList.remove('logic-pending')));
+          },120);
+        },80);
+      }
+
+      window.addEventListener('atom-source-team-sync-ready',()=>{sourcesReady=true;revealFinal();});
+      window.addEventListener('atom-project-progress-rules-ready',()=>{progressReady=true;revealFinal();});
+      window.addEventListener('atom-source-activity-changed',()=>{sourcesReady=true;revealFinal();});
+
+      const readinessPoll=setInterval(()=>{
+        markFromGlobals();
+        if(sourcesReady&&progressReady){clearInterval(readinessPoll);revealFinal();}
+      },50);
+
+      setTimeout(()=>{
+        clearInterval(readinessPoll);
+        markFromGlobals();
+        if(sourcesReady&&progressReady)revealFinal();
+        else{
+          try{window.ATOM_REQUIREMENT_PROGRESS_RULES?.recalc?.();}catch{}
+          revealed=true;
+          document.body.classList.remove('logic-pending');
+        }
+      },7000);
     })();
   </script>
   <script src="sync-status.js?v=1.2.1"></script>
