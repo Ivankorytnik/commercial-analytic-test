@@ -1,5 +1,5 @@
 (function(){
-  const VERSION='1.1.0';
+  const VERSION='1.2.0';
   const DAY=86400000;
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
   const read=(k,f)=>{try{const v=JSON.parse(localStorage.getItem(k)||'');return v??f}catch{return f}};
@@ -41,6 +41,19 @@
     if(changed)write('atom-blockers',rows);
   }
 
+  function sortOverviewTeamCards(){
+    const c=core(),a=activity(),grid=document.querySelector('#core-team-readiness .core-team-grid');
+    if(!c||!a||!grid)return;
+    const cards=[...grid.querySelectorAll('.core-team-card')];
+    if(cards.length<2)return;
+    const order=new Map(c.teams().map((team,index)=>[team,index]));
+    const desired=cards.map(card=>{
+      const team=card.querySelector('.core-team-name')?.textContent.trim()||'';
+      return {card,team,active:a.isActive(team),order:order.has(team)?order.get(team):9999};
+    }).sort((x,y)=>Number(y.active)-Number(x.active)||x.order-y.order).map(x=>x.card);
+    if(desired.some((card,index)=>card!==cards[index]))desired.forEach(card=>grid.appendChild(card));
+  }
+
   function patchOverview(){
     const c=core(),a=activity();
     if(!c||!a||!document.querySelector('#app .project-start-card'))return;
@@ -66,6 +79,7 @@
       if(inactive&&!badge){badge=document.createElement('span');badge.className='team-inactive-badge';badge.textContent='Не активна';card.appendChild(badge);}
       if(!inactive&&badge)badge.remove();
     });
+    sortOverviewTeamCards();
 
     const relevant=relevantStages(),done=relevant.filter(id=>c.stageSummary(id).progress>=100).length;
     document.querySelectorAll('#app .core-extra-kpi').forEach(card=>{
