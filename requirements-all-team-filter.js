@@ -1,5 +1,5 @@
 (function(){
-  const VERSION='1.1.0';
+  const VERSION='1.2.0';
   const ALL='__all__';
   const SESSION_KEY='atom-pa-requirements-team-filter';
   const PENDING_KEY='atom-requirements-team-filter-pending';
@@ -68,7 +68,7 @@
     if(!table||!body)return;
     body.innerHTML=rows.map(r=>{
       const st=c.getState(r.id),p=c.periodForRequirement(r);
-      return `<tr data-pa-req="${esc(r.id)}" data-pa-all-team="${esc(r.team)}"><td><b class="pa-all-team-label">${esc(r.team)}</b><br>${esc(r.text)}</td><td>${r.custom?`<select data-pa-req-stage>${stageOptions(r.stageId)}</select>`:`<b>${r.stageId}. ${esc(p?.stageName||c.stageName(r.stageId))}</b>`}</td><td><b>${fmt(p?.startDate)} - ${fmt(p?.endDate)}</b>${p?.changed?'<br><span class="pa-note">срок этапа перенесен</span>':''}</td><td><select data-pa-req-status>${statusOptions(st.statusId)}</select></td><td><select data-pa-req-person>${personOptions(st.respondentId)}</select></td><td><textarea data-pa-req-comment>${esc(st.comment||'')}</textarea></td><td>${r.custom?`<button class="btn pa-delete-req" data-id="${esc(r.id)}">Удалить</button>`:''}</td></tr>`;
+      return `<tr data-pa-req="${esc(r.id)}" data-pa-all-team="${esc(r.team)}"><td><b class="pa-all-team-label">${esc(r.team)}</b><br>${esc(r.text)}</td><td>${r.custom?`<select data-pa-req-stage>${stageOptions(r.stageId)}</select>`:`<b>${r.stageId}. ${esc(p?.stageName||c.stageName(r.stageId))}</b>`}</td><td class="pa-req-period"><b>${fmt(p?.startDate)} - ${fmt(p?.endDate)}</b>${p?.customTimes?'<br><span class="pa-note">индивидуальный срок</span>':p?.changed?'<br><span class="pa-note">срок этапа перенесен</span>':''}<br><button type="button" class="btn req-period-edit" data-id="${esc(r.id)}" style="margin-top:5px;padding:4px 7px;font-size:9px">Изменить</button></td><td><select data-pa-req-status>${statusOptions(st.statusId)}</select></td><td><select data-pa-req-person>${personOptions(st.respondentId)}</select></td><td><textarea data-pa-req-comment>${esc(st.comment||'')}</textarea></td><td>${r.custom?`<button class="btn pa-delete-req" data-id="${esc(r.id)}">Удалить</button>`:''}</td></tr>`;
     }).join('');
     panel.dataset.requirementsAllRendered='1';
 
