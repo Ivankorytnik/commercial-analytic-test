@@ -1,5 +1,5 @@
 (function(){
-  const VERSION='1.0.0';
+  const VERSION='1.1.0';
   const ALL='__all__';
   const SESSION_KEY='atom-pa-requirements-team-filter';
   const STABLE_KEY='atom-requirements-stable-team-filter';
@@ -8,41 +8,46 @@
     '[data-req-enh-status]','select[data-pa-req-status]',
     '[data-req-enh-person]','select[data-pa-req-person]',
     '[data-req-enh-stage]','select[data-pa-req-stage]',
-    '#req-enh-new-team','#req-enh-new-stage'
+    '#req-enh-new-team','#req-enh-new-stage',
+    '#pa-new-req','#pa-new-req-stage','[data-pa-req-comment]',
+    '#pa-panel input','#pa-panel textarea','#pa-panel select'
   ].join(',');
+  const DRAFT_SELECTOR='#req-enh-new-team,#req-enh-new-stage,#pa-new-req,#pa-new-req-stage';
   const GUARDED_EVENTS=[
     'atom-core-data-changed','atom-sync-update','atom-view-rendered',
     'atom-reference-data-changed','atom-project-reconciled'
   ];
 
   let lockUntil=0;
-  let activeSelect=null;
+  let activeControl=null;
   const pending=new Map();
   let flushQueued=false;
 
   const inRequirements=()=>location.hash.startsWith('#management/requirements');
-  const isSelect=el=>Boolean(el?.matches?.(SELECTOR));
-  const isLocked=()=>inRequirements()&&Date.now()<lockUntil;
+  const isGuarded=el=>Boolean(el?.matches?.(SELECTOR));
+  const hasActiveFocus=()=>Boolean(activeControl?.isConnected&&document.activeElement===activeControl);
+  const isLocked=()=>inRequirements()&&(Date.now()<lockUntil||hasActiveFocus());
+  const isDraft=el=>Boolean(el?.matches?.(DRAFT_SELECTOR));
 
-  function rememberTeam(select){
-    if(!select?.matches?.('#req-enh-team,#pa-req-team'))return;
-    const value=select.value||ALL;
+  function rememberTeam(control){
+    if(!control?.matches?.('#req-enh-team,#pa-req-team'))return;
+    const value=control.value||ALL;
     sessionStorage.setItem(SESSION_KEY,value);
     sessionStorage.setItem(STABLE_KEY,value);
     try{window.ATOM_REQUIREMENTS_FILTER_PERSISTENCE?.remember?.(value,true);}catch{}
   }
 
-  function lock(select,ms=30000){
-    if(!inRequirements()||!isSelect(select))return;
-    activeSelect=select;
+  function lock(control,ms=30000){
+    if(!inRequirements()||!isGuarded(control))return;
+    activeControl=control;
     lockUntil=Math.max(lockUntil,Date.now()+ms);
-    rememberTeam(select);
-    try{select.focus({preventScroll:true});}catch{try{select.focus();}catch{}}
+    rememberTeam(control);
+    try{control.focus({preventScroll:true});}catch{try{control.focus();}catch{}}
   }
 
   function unlock(){
     lockUntil=0;
-    activeSelect=null;
+    activeControl=null;
     flushPending();
   }
 
@@ -64,49 +69,54 @@
     },0);
   }
 
-  // Native <select> receives focus slightly after pointerdown. Existing project scripts
-  // use document.activeElement as a guard, so focus it synchronously before their queued
-  // render callbacks can detach/rebuild its row.
+  // Protect any requirements form control from background re-render while the user is
+  // actively editing it. This includes the unsaved "new requirement" draft fields.
   document.addEventListener('pointerdown',e=>{
-    const select=e.target.closest?.(SELECTOR);
-    if(select)lock(select);
+    const control=e.target.closest?.(SELECTOR);
+    if(control)lock(control);
   },true);
 
   document.addEventListener('mousedown',e=>{
-    const select=e.target.closest?.(SELECTOR);
-    if(select)lock(select);
+    const control=e.target.closest?.(SELECTOR);
+    if(control)lock(control);
   },true);
 
   document.addEventListener('focusin',e=>{
-    const select=e.target.closest?.(SELECTOR);
-    if(select)lock(select);
+    const control=e.target.closest?.(SELECTOR);
+    if(control)lock(control);
   },true);
 
   document.addEventListener('keydown',e=>{
-    if(isSelect(e.target))lock(e.target);
+    if(isGuarded(e.target))lock(e.target);
   },true);
 
-  // By the time change fires, the user has made a choice. Let the normal handlers save
-  // and filter, then replay any project refresh event that was postponed while open.
+  // Saved row dropdowns may unlock after change because their normal handler persists
+  // the value. Draft controls and text fields remain protected until focus leaves them.
   document.addEventListener('change',e=>{
-    const select=e.target.closest?.(SELECTOR);
-    if(!select)return;
-    rememberTeam(select);
+    const control=e.target.closest?.(SELECTOR);
+    if(!control)return;
+    rememberTeam(control);
+    if(isDraft(control)||control.matches('input,textarea'))return;
     lockUntil=0;
-    activeSelect=null;
+    activeControl=null;
     setTimeout(flushPending,0);
   },true);
 
   document.addEventListener('focusout',e=>{
-    if(!isSelect(e.target))return;
+    if(!isGuarded(e.target))return;
     setTimeout(()=>{
+      const next=document.activeElement;
+      if(next&&isGuarded(next)){
+        lock(next);
+        return;
+      }
       if(document.activeElement===e.target)return;
       unlock();
-    },80);
+    },120);
   },true);
 
-  // Suppress background refresh events only while a native dropdown is actually being
-  // interacted with. They are replayed immediately after the choice/focus change.
+  // Suppress background refresh events while the user is editing. They are replayed
+  // after the active control is left so cloud state is still applied without data loss.
   GUARDED_EVENTS.forEach(type=>{
     window.addEventListener(type,e=>{
       if(!isLocked())return;
@@ -143,6 +153,6 @@
     lock,
     unlock,
     applyHashTeam,
-    active:()=>activeSelect
+    active:()=>activeControl
   };
 })();
